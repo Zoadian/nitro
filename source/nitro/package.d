@@ -10,3 +10,4 @@ module nitro;
 
 public import nitro.ecm;
 public import nitro.sm;
+public import nitro.autogen;
