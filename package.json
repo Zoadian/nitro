@@ -6,7 +6,7 @@
 	"authors": ["Felix 'Zoadian' Hufnagel"],
 	
 	"targetPath": "bin",
-    "targetType": "library",
+	"targetType": "library",
 	
 	"dependencies": {
 	}
