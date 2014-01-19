@@ -3,11 +3,9 @@
 	"license": "BSL-1.0",
 	"description": "An Entity Component System.",
 	"copyright": "Copyright © 2014, Felix 'Zoadian' Hufnagel",
-	"authors": ["Felix 'Zoadian' Hufnagel"],
+	"authors": [
+		"Felix 'Zoadian' Hufnagel"
+	],
 	
-	"targetPath": "bin",
-	"targetType": "library",
-	
-	"dependencies": {
-	}
+	"targetType": "sourceLibrary"
 }
