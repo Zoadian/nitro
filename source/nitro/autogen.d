@@ -72,9 +72,10 @@ mixin template MakeECS(string T) {
 
 	mixin ComponentSystemLookup;
 	string c(string s...) {
+		import std.algorithm : splitter;
 		auto e = s.splitter(","); 
 		//gen imports
-		string res = "import ";	
+		string res = "import std.typetuple; import ";	
 		foreach(k; e) {
 			res ~= k ~",";
 		}		   
