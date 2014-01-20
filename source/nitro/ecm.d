@@ -43,9 +43,9 @@ private:
 	ComponentMask!CS[Entity] _componentMasks;
 	E_CS_MAP _components;
 
-	pragma(msg, "========================");
-	pragma(msg, "Components: ", CS);
-	pragma(msg, "========================");
+	//pragma(msg, "========================");
+	//pragma(msg, "Components: ", CS);
+	//pragma(msg, "========================");
 
 public:
 	/**
@@ -54,7 +54,7 @@ public:
 	Entity createEntity() {
 		Entity entity = Entity(++_cnt.id);		   
 		this._componentMasks[entity] = ComponentMask!CS();
-		this._componentMasks.rehash();
+		//this._componentMasks.rehash();
 		return entity;
 	}
 
@@ -63,7 +63,7 @@ public:
 	*/
 	void destroyEntity(Entity entity) {
 		this._componentMasks.remove(entity);
-		this._componentMasks.rehash();
+		//this._componentMasks.rehash();
 		foreach(c, C; CS) {					  
 			this._components[c].remove(entity);
 		}

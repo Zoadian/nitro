@@ -27,9 +27,9 @@ private:
 private:
 	ECM _ecm = new ECM();
 	SYSTEMS _systems;		  
-	pragma(msg, "========================");
-	pragma(msg, "Systems: ", SYSTEMS);
-	pragma(msg, "========================");
+	//pragma(msg, "========================");
+	//pragma(msg, "Systems: ", SYSTEMS);
+	//pragma(msg, "========================");
 
 public:	   
 	/**
