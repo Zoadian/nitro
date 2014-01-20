@@ -13,7 +13,7 @@ import std.algorithm : filter;
 import std.typecons : Typedef;
 
 
-private struct Entity { 
+struct Entity { 
 	ulong id; 
 	alias id this; 
 }
