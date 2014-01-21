@@ -37,13 +37,15 @@ mixin template AutoQueryMapper(alias ECM) {
 			enum IterateQueryFkts = RESULT;
     }
 
-    mixin(
-		  "bool AutoQueryFkt() { bool deleteEntity = false; " ~
-		  IterateQueryFkts!(typeof(this), __traits(getOverloads, typeof(this), "query")) ~
-		  "return true; }"
-		  );
+    static if(__traits(compiles, __traits(getOverloads, typeof(this), "query"))) {
+        mixin(
+		      "bool AutoQueryFkt() { bool deleteEntity = false; " ~
+		      IterateQueryFkts!(typeof(this), __traits(getOverloads, typeof(this), "query")) ~
+		      "return true; }"
+		      );
 
-	bool autoQueryFktExecuted = AutoQueryFkt();
+	    bool autoQueryFktExecuted = AutoQueryFkt();
+    }
 }
 
 
