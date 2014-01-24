@@ -171,19 +171,19 @@ public:
 private:	
 	void _set(C)() { 
 		alias IDX = staticIndexOf!(C, CS);
-		static assert(IDX != -1, C.stringof ~ " is not part of " ~ this.stringof);
+		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
 		this._bits[IDX / 8] |=  1 << (IDX % 8);
 	}
 
 	void _unset(C)() {	   
 		alias IDX = staticIndexOf!(C, CS);
-		static assert(IDX != -1, C.stringof ~ " is not part of " ~ this.stringof);	 
+		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);	 
 		this._bits[IDX / 8] &= ~(1 << (IDX % 8));
 	}
 
 	bool _isset(C)() {		
 		alias IDX = staticIndexOf!(C, CS);
-		static assert(IDX != -1, C.stringof ~ " is not part of " ~ this.stringof);
+		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
 		return (this._bits[IDX / 8] & (1 << (IDX % 8))) > 0;
 	}
 }	 
