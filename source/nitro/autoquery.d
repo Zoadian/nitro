@@ -57,12 +57,23 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 	// Remove optional ecs parameter from list
 	static if(PARAMS[0] == typeof(ECM).stringof) {
         enum ecmDefined = true;
-		alias TYPES = PARAMS[1..$];
+		alias TYPES_WITHOUT_ECM = PARAMS[1..$];
     }
     else {
         enum ecmDefined = false;
-		alias TYPES = PARAMS;
+		alias TYPES_WITHOUT_ECM = PARAMS;
     }
+
+    // Remove optional entity parameter from list
+    static if(TYPES_WITHOUT_ECM[0] == "Entity") {
+        enum entityDefined = true;
+		alias TYPES = TYPES_WITHOUT_ECM[1..$];
+    }
+    else {
+        enum entityDefined = false;
+		alias TYPES = TYPES_WITHOUT_ECM;
+    }
+
 
 	// Generate list of types
 	string typeList = "";
@@ -87,6 +98,9 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// Supply optional ecm parameter if defined
 	static if(ecmDefined) { code ~= ecmIdentifier ~ ","; }
+
+	// Supply optional entity parameter if defined
+	static if(entityDefined) { code ~= "e,"; }
 
 	// Supply all component parameters
 	foreach(i, TYPE; TYPES) {
