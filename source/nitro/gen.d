@@ -30,9 +30,9 @@ mixin template ComponentSystemLookup() {
 	ComponentsOfModule
 	*/
 	template ComponentsOfModule(alias M) {
-		template TYPE(alias T) {
-			static if(__traits(compiles, __traits(getMember, M, T)())) {
-				alias TYPE = typeof(__traits(getMember, M, T)());
+		template TYPE(string MEMBER_NAME) {
+			static if(__traits(compiles, __traits(getMember, M, MEMBER_NAME)())) {
+				alias TYPE = typeof(__traits(getMember, M, MEMBER_NAME)());
 			}	
 			else {
 				alias TYPE = void;
@@ -48,10 +48,16 @@ mixin template ComponentSystemLookup() {
 	SystemsOfModule
 	*/
 	template SystemsOfModule(alias M) {		
-		template TYPE(alias T) {	 		  
-			static if(__traits(compiles, mixin(T~"!(EntityComponentManager!())"))) {	   				
-				mixin("alias TYPE ="~ T ~"!(EntityComponentManager!());");
-			}	
+		template TYPE(string MEMBER_NAME) {
+			// Temporary solution (hack)
+			static if(__traits(compiles, __traits(getMember, M, MEMBER_NAME).stringof)) {
+				enum MEMBER_DEFINITION = __traits(getMember, M, MEMBER_NAME).stringof;
+				import std.algorithm : startsWith, endsWith;
+				static if(MEMBER_DEFINITION.startsWith("class ") && MEMBER_DEFINITION.endsWith("(ECM)"))
+					mixin("alias TYPE ="~ MEMBER_NAME ~"!(EntityComponentManager!());");
+				else 
+					alias TYPE = void;
+			}
 			else {
 				alias TYPE = void;
 			}
