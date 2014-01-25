@@ -83,7 +83,7 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 	}
 
 	// Start loop over all entities
-	code ~= "foreach(e;" ~ ecmIdentifier ~ ".query!(" ~ typeList ~ ")()){";
+	code ~= "foreach(e;" ~ ecmIdentifier ~ ".queryReverse!(" ~ typeList ~ ")()){";
 
 	// Get all components for query
 	foreach(TYPE; TYPES) {
@@ -110,7 +110,7 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// If function returns bool, remove component if true
 	// TODO: destroyEntity instead of removeComponent
-	if(isBool) { code ~= "if(deleteEntity){" ~ ecmIdentifier ~ ".removeComponent!(" ~ typeList ~ ")(e); }"; }
+	if(isBool) { code ~= "if(deleteEntity){" ~ ecmIdentifier ~ ".destroyEntity(e); }"; }
 
 	// Close entity iteration
 	code ~= "}";
