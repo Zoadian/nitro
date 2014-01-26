@@ -47,12 +47,13 @@ mixin template AutoQueryMapper(alias ECM) {
     }
 
     static if(__traits(compiles, __traits(getOverloads, typeof(this), "query"))) {
-        mixin(
-		      "bool AutoQueryFkt() { bool deleteEntity = false; " ~
-		      IterateQueryFkts!(typeof(this), __traits(getOverloads, typeof(this), "query")) ~
-		      "return true; }"
-		      );
-
+		private import std.algorithm : sort;
+		private import std.array : array;
+		bool AutoQueryFkt() { 
+			bool deleteEntity = false;
+			mixin(IterateQueryFkts!(typeof(this), __traits(getOverloads, typeof(this), "query")));
+			return true; 
+		}
 	    bool autoQueryFktExecuted = AutoQueryFkt();
     }
 }
@@ -92,7 +93,8 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 	}
 
 	// Start loop over all entities
-	code ~= "foreach(e;" ~ ecmIdentifier ~ ".queryReverse!(" ~ typeList ~ ")()){";
+	// Todo: remove array and sort from implementation once ECM is improved
+	code ~= "foreach(e;" ~ ecmIdentifier ~ ".query!(" ~ typeList ~ ")().array().sort()){";
 
 	// Get all components for query
 	foreach(TYPE; TYPES) {

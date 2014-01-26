@@ -11,7 +11,6 @@ module nitro.ecm;
 import std.typetuple : NoDuplicates, staticMap, staticIndexOf;
 import std.algorithm : filter;
 import std.typecons : Typedef;
-import std.array : array;
 
 
 struct Entity { 
@@ -28,8 +27,7 @@ class EntityComponentManager(ALL_COMPONENTS...) if(ALL_COMPONENTS.length == 0) {
 	PC getComponent(PC)(Entity entity){return PC();}
 	void removeComponent(PCS...)(Entity entity){}
 	void clearComponents(Entity entity){}
-	Entity[] query(PCS...)(){return [Entity(0)];}			
-	Entity[] queryReverse(PCS...)(){return [Entity(0)];}
+	Entity[] query(PCS...)(){return [Entity(0)];}
 }
 
 /**
@@ -63,7 +61,7 @@ public:
 	Destroys an Entity and Removes all its Components.
 	*/
 	void destroyEntity(Entity entity) {
-		this._componentMasks.remove(entity);
+		this._componentMasks.remove(entity); 
 		//this._componentMasks.rehash();
 		foreach(c, C; CS) {					  
 			this._components[c].remove(entity);
@@ -131,13 +129,6 @@ public:
 	*/									   
 	auto query(PCS...)() {
 		return this._componentMasks.byKey.filter!( entity => hasComponent!PCS(entity) )();
-	}
-
-	/**
-	Returns an InputRange that iterates over all Entities with given set of Components, in reverse order.
-	*/									   
-	auto queryReverse(PCS...)() {
-		return this._componentMasks.byKey.array.reverse.filter!( entity => hasComponent!PCS(entity) )();
 	}
 
 private:
