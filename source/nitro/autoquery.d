@@ -9,6 +9,15 @@ Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel), $(WEB lvl3.org, Paul Fre
 module nitro.autoquery;
 
 //---------------------------------------------------------------------------------------------------
+
+void pushEntity(ECM, ARGS...)(ECM ecm, ARGS args) {
+	auto e = ecm.createEntity();
+	foreach(arg;args) {
+        ecm.addComponent(e, arg);
+	}
+}
+
+//---------------------------------------------------------------------------------------------------
 mixin template AutoQuery() {
 	void run(ECM)(ECM ecm) {
 		mixin AutoQueryMapper!(ecm);
