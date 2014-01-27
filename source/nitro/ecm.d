@@ -13,7 +13,7 @@ import std.algorithm : filter;
 import std.typecons : Typedef;
 
 
-private struct Entity { 
+struct Entity { 
 	ulong id; 
 	alias id this; 
 }
@@ -27,8 +27,7 @@ class EntityComponentManager(ALL_COMPONENTS...) if(ALL_COMPONENTS.length == 0) {
 	PC getComponent(PC)(Entity entity){return PC();}
 	void removeComponent(PCS...)(Entity entity){}
 	void clearComponents(Entity entity){}
-	Entity[] query(PCS...)(){return [Entity(0)];}			
- 
+	Entity[] query(PCS...)(){return [Entity(0)];}
 }
 
 /**
@@ -43,9 +42,9 @@ private:
 	ComponentMask!CS[Entity] _componentMasks;
 	E_CS_MAP _components;
 
-	pragma(msg, "========================");
-	pragma(msg, "Components: ", CS);
-	pragma(msg, "========================");
+	//pragma(msg, "========================");
+	//pragma(msg, "Components: ", CS);
+	//pragma(msg, "========================");
 
 public:
 	/**
@@ -54,7 +53,7 @@ public:
 	Entity createEntity() {
 		Entity entity = Entity(++_cnt.id);		   
 		this._componentMasks[entity] = ComponentMask!CS();
-		this._componentMasks.rehash();
+		//this._componentMasks.rehash();
 		return entity;
 	}
 
@@ -62,8 +61,8 @@ public:
 	Destroys an Entity and Removes all its Components.
 	*/
 	void destroyEntity(Entity entity) {
-		this._componentMasks.remove(entity);
-		this._componentMasks.rehash();
+		this._componentMasks.remove(entity); 
+		//this._componentMasks.rehash();
 		foreach(c, C; CS) {					  
 			this._components[c].remove(entity);
 		}
@@ -171,19 +170,19 @@ public:
 private:	
 	void _set(C)() { 
 		alias IDX = staticIndexOf!(C, CS);
-		static assert(IDX != -1, C.stringof ~ " is not part of " ~ this.stringof);
+		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
 		this._bits[IDX / 8] |=  1 << (IDX % 8);
 	}
 
 	void _unset(C)() {	   
 		alias IDX = staticIndexOf!(C, CS);
-		static assert(IDX != -1, C.stringof ~ " is not part of " ~ this.stringof);	 
+		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);	 
 		this._bits[IDX / 8] &= ~(1 << (IDX % 8));
 	}
 
 	bool _isset(C)() {		
 		alias IDX = staticIndexOf!(C, CS);
-		static assert(IDX != -1, C.stringof ~ " is not part of " ~ this.stringof);
+		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
 		return (this._bits[IDX / 8] & (1 << (IDX % 8))) > 0;
 	}
 }	 

@@ -10,3 +10,5 @@ module nitro;
 
 public import nitro.ecm;
 public import nitro.sm;
+public import nitro.gen;
+public import nitro.autoquery;

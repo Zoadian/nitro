@@ -8,5 +8,12 @@
 		"Paul Freund"
 	],
 	
+<<<<<<< HEAD
+	"targetPath": "bin",
+	
+	"dependencies": {
+	}
+=======
 	"targetType": "sourceLibrary"
+>>>>>>> master
 }
