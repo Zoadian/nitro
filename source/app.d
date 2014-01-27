@@ -11,15 +11,15 @@ class TestSystem(ECS) {
 	}
 }
 
-struct pt {
+struct Point {
 	int x,y,z;
 }
 
 struct XXX {
 	int aasd;
 	float b;
+	Point d;
 	int[] c;
-	pt d;
 }
 
 struct ADKC {
@@ -31,12 +31,16 @@ void main(){
 
 	sm.run();
 	
-	ArraySoA!XXX xxx;
+	SoAArray!XXX xxx;
 	
-	xxx ~= XXX(1,2,[1,2,3], pt(4,5,6));
-	xxx ~= XXX(2,2,[2,2,3], pt(5,5,6));
-	xxx ~= XXX(3,2,[3,2,3], pt(6,5,6));
-	xxx ~= XXX(4,2,[4,2,3], pt(7,5,6));
+	
+	ToSoA!int aasfdgfrr;
+	
+	
+	xxx ~= XXX(1, 2, Point(4,5,6), [1,2,3]);
+	xxx ~= XXX(2, 2, Point(5,5,6), [2,2,3]);
+	xxx ~= XXX(3, 2, Point(6,5,6), [3,2,3]);
+	xxx ~= XXX(4, 2, Point(7,5,6), [4,2,3]);
 	
 	foreach(i; 0..xxx.length){
 		auto asd = xxx[i];
