@@ -68,10 +68,8 @@ struct Accessor(T) {
 		string ret;
 		alias FTT = FieldTypeTuple!T;
 		foreach(i, F; FTT) {
-
 			enum IDX = (i > 0) ? TypeTuple!(staticMap!(RepresentationTypeTuple, FTT[0..i])).length : 0;
-			pragma(msg, IDX);
-			
+				
 			static if(FieldTypeTuple!F.length > 1) {
 				ret ~= "@property Accessor!(" ~ F.stringof ~ ") " ~ to!string(T.tupleof[i].stringof) ~ "(){ return Accessor!(" ~ F.stringof ~ ")(_idx, _pData[" ~ to!string(IDX) ~ ".." ~ to!string(IDX + RepresentationTypeTuple!F.length) ~ "]); };\n";
 			}
@@ -82,13 +80,14 @@ struct Accessor(T) {
 		return ret;
 	}
 
-	pragma(msg, T.stringof);
-	pragma(msg, SOA_PTRS.stringof);
-	pragma(msg, _gen());
+	//~ pragma(msg, T.stringof);
+	//~ pragma(msg, SOA_PTRS.stringof);
+	//~ pragma(msg, _gen());
 	
 	void test(){
 		import std.stdio;
 		foreach(ref x; _pData) {
+			if((*x).length > _idx) 
 			(*x)[_idx].writeln();
 		}
 	}
@@ -98,6 +97,14 @@ struct Accessor(T) {
 
 
 import std.array : back;
+import std.traits : RepresentationTypeTuple, FieldTypeTuple;
+
+
+
+
+
+
+
 
 /**
 Implements an 'Structure of Arrays' Array.
@@ -105,10 +112,27 @@ Implements an 'Structure of Arrays' Array.
 struct SoAArray(T) {
 	ToSoA!T _data;
 	
-	void opOpAssign(string op : "~")(T t) {		
-		foreach(i, Field; ToSoA!T) {
-			this._data[i] ~= t.tupleof[i];
+	void opOpAssign(string op : "~")(T t) {	
+		
+		void fnAssign(size_t idx, X)(X x){		
+				
+			pragma(msg, "\n" ,FieldTypeTuple!X);
+			
+			foreach(i, F; FieldTypeTuple!X) {
+				enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
+				
+				static if(FieldTypeTuple!F.length > 1) {
+					fnAssign!(IDX)(x.tupleof[i]);
+				}
+				else {
+				pragma(msg, "this._data[",IDX,"] ~= x.tupleof[",i,"];");
+					this._data[IDX] ~= x.tupleof[i];
+				}
+			}
+			pragma(msg, "\n");
 		}
+		
+		fnAssign!(0)(t);
 	}
 	
 	void remove(size_t idx) {
