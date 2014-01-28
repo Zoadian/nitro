@@ -50,9 +50,13 @@ void main(){
 	xxx ~= XXX(300, 200, Point(600,500,600), [300,200,300]);
 	xxx ~= XXX(4000, 2000, Point(7000,5000,6000), [4000,2000,3000]);
 	
+	xxx.remove(0);
+	
 	foreach(i; 0..xxx.length){
 		auto asd = xxx[i];
 		asd.test();
+		asd.d.writeln(asd.d.x, asd.d.y, asd.d.z);
+		
 		"-----------".writeln(i);
 	}
 }
