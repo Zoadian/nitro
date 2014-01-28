@@ -8,6 +8,8 @@ Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel)
 */
 module nitro.soa;
 
+import std.typetuple;
+
 private alias _ToDynamicArray(T) = T[];	
 
 /**
@@ -20,11 +22,11 @@ template ToSoA(T) {
 	alias ToSoA = staticMap!(_ToDynamicArray, _FIELDS);
 }
 unittest {
-	struct Test0 { }
+	struct Test0 { char a; }
 	struct Test1 { int a; }
 	struct Test2 { int a; float b; }
 	struct Test3 { Test0 a; Test1 b; Test2 c; }
-	struct Test4 { Test0 a; Test1 b; Test2 c; Test3 d; }
+	struct Test4 { Test0 a; Test1 b; Test2 c; Test3 d; Test0 aa; }
 	struct Test5 { int* a; int[] b; int[12] c; }
 	
 	static assert( is(ToSoA!Test0 == TypeTuple!()));
@@ -34,36 +36,20 @@ unittest {
 	static assert( is(ToSoA!Test4 == TypeTuple!(int[], int[], float[], int[], int[], float[]) ));
 	static assert( is(ToSoA!Test5 == TypeTuple!(int*[], int[][], int[12][]) ));
 
-	//~ pragma(msg, "SOA: ", ToSoA!Test0);
-	//~ pragma(msg, "SOA: ", ToSoA!Test1);
-	//~ pragma(msg, "SOA: ", ToSoA!Test2);
-	//~ pragma(msg, "SOA: ", ToSoA!Test3);
-	//~ pragma(msg, "SOA: ", ToSoA!Test4);
-	//~ pragma(msg, "SOA: ", ToSoA!Test5);	
+//	pragma(msg, "SOA: ", ToSoA!Test0);
+//	pragma(msg, "SOA: ", ToSoA!Test1);
+//	pragma(msg, "SOA: ", ToSoA!Test2);
+//	pragma(msg, "SOA: ", ToSoA!Test3);
+//	pragma(msg, "SOA: ", ToSoA!Test4);
+//	pragma(msg, "SOA: ", ToSoA!Test5);	
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-string _GEN(size_t ) {
-	
-}
 
 
 
 
 struct Accessor(T) {
-	import std.traits : RepresentationTypeTuple;
+	import std.traits : RepresentationTypeTuple, FieldTypeTuple;
 	import std.typetuple : staticMap;
 	import std.conv;
 	private alias _ToPointer(T) = T*;	
@@ -77,50 +63,27 @@ struct Accessor(T) {
 			_pData[i] = &k[i];
 		}
 	}
-	
-	
-	
-	template _GEN(T...) {
+
+	static string _gen() {
+		string ret;
 		alias FTT = FieldTypeTuple!T;
-		alias RTT = RepresentationTypeTuple!T;
-		
-		alias _GEN = _GEN();
-	}
-	
-	
-	
-	private static string _gen() {
-		string s;
-		size_t idxData = 0;
-		foreach(i, K; typeof(T.tupleof)) {
-				pragma(msg, "PENS", SOA_PTRS[idxData]);
-			static if(is(SOA_PTRS[idxData] == _ToDynamicArray!K*)) {
-				pragma(msg, "YES: ", K.stringof);
-				s ~= "@property " ~ K.stringof ~ " " ~ T.tupleof[i].stringof ~ "() const { return _pData[" ~ to!string(idxData) ~ "][_idx]; } \n\n";
-				++idxData;
+		foreach(i, F; FTT) {
+
+			enum IDX = (i > 0) ? TypeTuple!(staticMap!(RepresentationTypeTuple, FTT[0..i])).length : 0;
+			pragma(msg, IDX);
+			
+			static if(FieldTypeTuple!F.length > 1) {
+				ret ~= "@property Accessor!(" ~ F.stringof ~ ") " ~ to!string(T.tupleof[i].stringof) ~ "(){ return Accessor!(" ~ F.stringof ~ ")(_idx, _pData[" ~ to!string(IDX) ~ ".." ~ to!string(IDX + RepresentationTypeTuple!F.length) ~ "]); };\n";
 			}
 			else {
-				pragma(msg, "NOO: ", K.stringof);
-				//idxData += RepresentationTypeTuple!K.length;
-				//s ~= "@property Accessor!" ~ K.stringof ~ " " ~ T.tupleof[i].stringof ~ "() const { return ; } \n\n";
+				ret ~= "@property " ~ F.stringof ~ " " ~ to!string(T.tupleof[i].stringof) ~ "(){ return _pData[" ~ to!string(IDX) ~ "][_idx]; }\n";
 			}
 		}
-		
-		
-		//~ foreach(i, F; SOA_PTRS) {
-			//~ static if(is(F == _ToDynamicArray!(typeof(T.tupleof[i]))*)) {
-				//~ enum name = T.tupleof[i].stringof;
-				//~ s ~= "@property void " ~ name ~ "() const { return ; } \n\n";
-			//~ }
-			//~ else {
-				//~ import std.traits : RepresentationTypeTuple;
-				//~ //pragma(msg, RepresentationTypeTuple!(typeof(T.tupleof[i])));
-				//~ //pragma(msg, F, "\t", T.tupleof.stringof, "\t", i, "\t", typeof(T.tupleof[i]), "\t", is(F == _ToDynamicArray!(typeof(T.tupleof[i]))*));
-			//~ }						
-		//~ }
-		return s;
+		return ret;
 	}
-	mixin(_gen());
+
+	pragma(msg, T.stringof);
+	pragma(msg, SOA_PTRS.stringof);
 	pragma(msg, _gen());
 	
 	void test(){
@@ -149,10 +112,10 @@ struct SoAArray(T) {
 	}
 	
 	void remove(size_t idx) {
-		foreach(i, Field; ToSoA!T) {
-			_data[i][idx] = _data[i].back;
-			_data[i].length -= 1;
-		}
+//		foreach(i, Field; ToSoA!T) {
+//			_data[i][idx] = _data[i].back;
+//			_data[i].length -= 1;
+//		}
 	}
 	
 	size_t length() const @safe nothrow {
