@@ -1,6 +1,5 @@
 ﻿module nitro.ecs;
 
-import std.bitmanip;
 import std.stdio;
 import std.conv;
 import std.typetuple;
@@ -22,8 +21,52 @@ struct Entity {
 
 /****************************************************************
 */
-private struct ComponentBits(CS...) {
-	BitArray bits = BitArray(CS.length);
+private struct ComponentBits(CS...) { 
+private:
+	ubyte[CS.length / 8 + 1] _bits;
+	
+public:	   	   
+	void set(CSS...)() { 
+		foreach(C; CSS) {
+			this._set!C();			
+		}
+	}				 
+	
+	void unset(CSS...)() {
+		foreach(C; CSS) {
+			this._unset!C();			
+		}
+	}
+	
+	bool isset(CSS...)() {
+		foreach(C; CSS) {
+			if(!this._isset!C()) return false;			
+		}
+		return true;
+	}
+	
+	void clear() {
+		this._bits = this._bits.init;
+	}
+	
+private:	
+	void _set(C)() { 
+		alias IDX = staticIndexOf!(C, CS);
+		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
+		this._bits[IDX / 8] |=  1 << (IDX % 8);
+	}
+	
+	void _unset(C)() {	   
+		alias IDX = staticIndexOf!(C, CS);
+		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);	 
+		this._bits[IDX / 8] &= ~(1 << (IDX % 8));
+	}
+	
+	bool _isset(C)() {		
+		alias IDX = staticIndexOf!(C, CS);
+		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
+		return (this._bits[IDX / 8] & (1 << (IDX % 8))) > 0;
+	}
 }
 
 
@@ -103,7 +146,7 @@ public:
 		foreach(PC; PCS) {	
 			alias IDX = staticIndexOf!(PC, CS);
 			assert((entity in this._mapEntityComponentBits) !is null);
-			if(this._mapEntityComponentBits[entity].bits[IDX] == false) {
+			if(this._mapEntityComponentBits[entity].isset!PC()) {
 				return false;
 			}
 		}
@@ -126,7 +169,7 @@ public:
 		foreach(i, PC; PCS) {		
 			alias IDX = staticIndexOf!(PC, CS);
 			static assert(IDX != -1, "Component " ~ PC.stringof ~ " not known to ECM");
-			this._mapEntityComponentBits[entity].bits[IDX] = true;
+			this._mapEntityComponentBits[entity].set!PC() = true;
 
 			auto idx = _entityComponentPairs[IDX].entities.countUntil!(a => a > entity);
 			if(idx != -1) {
@@ -154,7 +197,7 @@ public:
 		import std.algorithm : remove, countUntil;
 		foreach(c, PC; PCS) {
 			alias IDX = staticIndexOf!(PC, CS);
-			this._mapEntityComponentBits[entity].bits[IDX] = false;
+			this._mapEntityComponentBits[entity].unset!PC() = false;
 
 			auto idx = _entityComponentPairs[IDX].entities.countUntil(entity);
 			if(idx == -1) throw new Exception("entity not found. this should not happen!");
