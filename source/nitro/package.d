@@ -8,7 +8,5 @@ Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel)
 */
 module nitro;
 
-public import nitro.ecm;
-public import nitro.sm;
+public import nitro.ecs;
 public import nitro.gen;
-public import nitro.autoquery;

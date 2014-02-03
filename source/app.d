@@ -43,6 +43,11 @@ void main(){
 
 	sm.run();
 
+	auto e = sm.ecm.createEntity();
+
+	sm.ecm.clearComponents(e);
+	
+
 	SoAArray!XXX xxx;
 	
 	xxx ~= XXX(1, 2, Point(4,5,6), [1,2,3]);

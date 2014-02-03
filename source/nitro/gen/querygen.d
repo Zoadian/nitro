@@ -6,7 +6,7 @@ License:   $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
 
 Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel), $(WEB lvl3.org, Paul Freund)
 */
-module nitro.autoquery;
+module nitro.gen.querygen;
 
 //---------------------------------------------------------------------------------------------------
 
