@@ -69,6 +69,7 @@ All parts of nitro are released under the [Boost software license - version 1.0]
  
 ## Todo
 
+* Enforce no duplicate components
 * Deletion stack for entities and components
 * Usage of SoA implementation
 * Unittests

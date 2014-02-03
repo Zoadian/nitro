@@ -13,7 +13,7 @@ module nitro.gen.querygen;
 void pushEntity(ECM, ARGS...)(ECM ecm, ARGS args) {
 	auto e = ecm.createEntity();
 	foreach(arg;args) {
-        ecm.addComponent(e, arg);
+        ecm.addComponents(e, arg);
 	}
 }
 
@@ -28,7 +28,8 @@ mixin template AutoQuery() {
 mixin template AutoQueryMapper(alias ECM) {
 
     private template IterateQueryFkts(PARENT, LIST...) if(LIST.length > 0) {
-        private import std.traits : ParameterTypeTuple, ReturnType;
+        import std.traits : ParameterTypeTuple, ReturnType;
+		import std.typetuple : staticMap; 
 
 		alias ELEMENT = LIST[0];
 		alias RETURN_TYPE = ReturnType!(ELEMENT);
@@ -94,11 +95,11 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// Start loop over all entities
 	// Todo: remove array and sort from implementation once ECM is improved
-	code ~= "foreach(e;" ~ ecmIdentifier ~ ".query!(" ~ typeList ~ ")().array().sort()){";
+	code ~= "foreach(e;" ~ ecmIdentifier ~ ".query!(" ~ typeList ~ ")()){";
 
 	// Get all components for query
 	foreach(TYPE; TYPES) {
-		code ~= "auto param" ~ TYPE ~ "=" ~ ecmIdentifier ~ ".getComponent!" ~ TYPE ~ "(e);";
+		code ~= "auto param" ~ TYPE ~ "= e.get!" ~ TYPE ~ "();";
 	}
 
 	// Get return value if bool return
@@ -115,12 +116,12 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// Supply all component parameters
 	foreach(i, TYPE; TYPES) {
-		code ~= "*param" ~ TYPE;
+		code ~= "param" ~ TYPE;
 		code ~= (i < (TYPES.length-1)) ? "," : ");";
 	}
 
 	// If function returns bool, remove component if true
-	// TODO: destroyEntity instead of removeComponent
+	// TODO: destroyEntity instead of removeComponents
 	if(isBool) { code ~= "if(deleteEntity){" ~ ecmIdentifier ~ ".destroyEntity(e); }"; }
 
 	// Close entity iteration

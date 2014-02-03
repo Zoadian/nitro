@@ -101,6 +101,7 @@ mixin template MakeECS(string T) {
 		}
 		res.length -= 1;
 		res ~= ");\n";
+
 		return res;
 	}
 	//pragma(msg, c(T));

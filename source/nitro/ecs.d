@@ -4,6 +4,7 @@ import std.bitmanip;
 import std.stdio;
 import std.conv;
 import std.typetuple;
+import std.array;
 
 import nitro.soa;
 
@@ -43,7 +44,21 @@ private template EntityComponentPairs(CS...) {
 
 /****************************************************************
 */
-class EntityComponentManager(CS...) {
+class EntityComponentManager(CS...) if(CS.length == 0) {
+	Entity createEntity() {return Entity(0);}
+	void destroyEntity(Entity entity) {}
+	bool isValid(Entity entity) const {return false;}
+	bool hasComponents(PCS...)(Entity entity) const {return false;}
+	void addComponents(PCS...)(Entity entity, PCS pcs) {}
+	void removeComponents(PCS...)(Entity entity) {}
+	alias clearComponents = removeComponents!CS;
+	auto getComponent(PC)(Entity entity) {return PC();}
+	auto query(PCS...)() {return QueryResult!(Entity[], CS)([], EntityComponentPairs!CS());}
+}
+
+/****************************************************************
+*/
+class EntityComponentManager(CS...) if(CS.length > 0) {
 private:
 	size_t _nextId = 0;
 	ComponentBits!CS[Entity] _mapEntityComponentBits;
@@ -87,6 +102,7 @@ public:
 	body {
 		foreach(PC; PCS) {	
 			alias IDX = staticIndexOf!(PC, CS);
+			assert((entity in this._mapEntityComponentBits) !is null);
 			if(this._mapEntityComponentBits[entity].bits[IDX] == false) {
 				return false;
 			}
@@ -99,16 +115,18 @@ public:
 	void addComponents(PCS...)(Entity entity, PCS pcs)
 	in {
 		assert(this.isValid(entity));
-		assert(!this.hasComponent!PC(entity));
+		assert(!this.hasComponents!PCS(entity));
 	}
 	out {
-		assert(this.hasComponent!PC(entity));
+		assert(this.hasComponents!PCS(entity));
 	}
 	body {
+		import std.algorithm : countUntil;
 		import std.array : insertInPlace;
 		foreach(i, PC; PCS) {		
 			alias IDX = staticIndexOf!(PC, CS);
-			this._mapEntityComponentBits[entity][IDX] = true;
+			static assert(IDX != -1, "Component " ~ PC.stringof ~ " not known to ECM");
+			this._mapEntityComponentBits[entity].bits[IDX] = true;
 
 			auto idx = _entityComponentPairs[IDX].entities.countUntil!(a => a > entity);
 			if(idx != -1) {
@@ -154,7 +172,7 @@ public:
 	auto getComponent(PC)(Entity entity)
 	in {
 		assert(this.isValid(entity));
-		assert(this.hasComponent!PC(entity));
+		assert(this.hasComponents!PC(entity));
 	}
 	body {	
 		import std.algorithm : countUntil;
@@ -166,10 +184,10 @@ public:
 
 	/************************************************************
 	*/
-	QueryResult!PCS query(PCS...)() {
+	auto query(PCS...)() {
 		import std.algorithm : filter, sort;
-		auto entities = this._mapEntityComponentBits.byKey.filter!(e => this.hasComponent!PCS(e))().sort;
-		return QueryResult!PCS(entities, this._entityComponentPairs);
+		auto entities = this._mapEntityComponentBits.byKey.filter!(e => this.hasComponents!PCS(e))().array.sort;
+		return QueryResult!(typeof(entities), CS)(entities, this._entityComponentPairs);
 	}
 }
 
@@ -177,7 +195,6 @@ public:
 /****************************************************************
 */
 struct QueryResult(R, CS...) {
-	alias AllKeysValues = staticMap!(KeysValues, CS);
 
 	size_t[CS.length] indices;
 	R _range;
@@ -213,14 +230,13 @@ struct QueryResult(R, CS...) {
 /****************************************************************
 */
 struct EntityResult(CS...) {
-private:
-	alias AllKeysValues = staticMap!(KeysValues, CS);
+public:
 	Entity _e;
+	alias _e this;
+
+private:
 	size_t[CS.length]* _pIndices;
 	EntityComponentPairs!CS _entityComponentPairs;
-
-public:
-	alias _e this;
 
 	/************************************************************
 	*/
@@ -235,9 +251,9 @@ public:
 	*/
 	auto ref get(P)() @property {
 		enum IDX = staticIndexOf!(P, CS);
-		for(;(*this._pIndices)[IDX] < this._entityComponentPairs[IDX].e.length; ++((*this._pIndices)[IDX])) {
-			if(_pKV[IDX].e[(*this._pIndices)[IDX]] == _e) {
-				return (this._entityComponentPairs[IDX].v[(*this._pIndices)[IDX]]);
+		for(;(*this._pIndices)[IDX] < this._entityComponentPairs[IDX].entities.length; ++((*this._pIndices)[IDX])) {
+			if(this._entityComponentPairs[IDX].entities[(*this._pIndices)[IDX]] == this._e) {
+				return (this._entityComponentPairs[IDX].components[(*this._pIndices)[IDX]]);
 			}
 		}
 		throw new Exception("no such component for entity");
