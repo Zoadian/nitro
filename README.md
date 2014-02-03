@@ -4,7 +4,7 @@ An Entity Component System (ECS) for the D Programming Language.
 
 ## Intro
 
-Nitro implements a basic ECS architecture. Additional information is broadly available but often differs with implementation. Some sources are: [T-machine](http://t-machine.org/index.php/2007/09/03/entity-systems-are-the-future-of-mmog-development-part-1/), [Wikipedia](http://en.wikipedia.org/wiki/Entity_component_system) and [RichardLords](http://www.richardlord.net/blog/what-is-an-entity-framework). The following description may be specific to this implementation.
+Nitro implements a basic ECS architecture. Additional information is broadly available but often differs with implementation. Some sources are: [T-machine](http://t-machine.org/index.php/2007/09/03/entity-systems-are-the-future-of-mmog-development-part-1/), [Wikipedia](http://en.wikipedia.org/wiki/Entity_component_system) and [RichardLords blog](http://www.richardlord.net/blog/what-is-an-entity-framework). The following description may be specific to this implementation.
 
 ### Basic terminology
 
@@ -23,7 +23,7 @@ Nitro implements a basic ECS architecture. Additional information is broadly ava
 
 ## Usage
 
-nitro is a combination of of the concepts of entities, components and systems. Systems encapsulate the execution logic and while they are intended to define the flow of the program, they are optional. In addition to these basic components nitro.gen contains helpers that aim to automate specific parts of the implementation.
+ECS is a combination of of the concepts of entities, components and systems. Systems encapsulate the execution logic and while they are intended to define the flow of the program, in nitro they are optional. In addition to these basic components nitro.gen contains helpers that aim to automate specific parts of the implementation.
 
 ### Entities/Components
 
@@ -32,31 +32,36 @@ TODO:
 	* createEntity
 	* destroyEntity
 	* isValid
-	* addComponent
-	* hasComponent
-	* getComponent
-	* removeComponent
+	* hasComponents
+	* addComponents
+	* removeComponents
 	* clearComponents
+	* getComponent
 	* query
+	* <EntityResult -> get>
 
 ### Systems
 
 TODO:
 * SystemManager
-    * Constructors
+    * <constructors>
     * run
     * system
 
 ### nitro.gen
 
+#### 
+
 TODO:
-	* AutoQuery
+* ecsgen
+    * MakeECS
+	* SystemsOfModule
+	* ComponentsOfModule
+* querygen
+    * AutoQuery
     * AutoQueryMapper
     * pushEntity
-
-    * MakeECS
-        * SystemsOfModule
-        * ComponentsOfModule
+	* <query functions>
 
 ## License
 

@@ -96,7 +96,7 @@ public:
 
 	/************************************************************
 	*/
-	void addComponenst(PCS...)(Entity entity, PCS pcs)
+	void addComponents(PCS...)(Entity entity, PCS pcs)
 	in {
 		assert(this.isValid(entity));
 		assert(!this.hasComponent!PC(entity));
@@ -231,7 +231,7 @@ public:
 	}
 		
 	/************************************************************
-	if there is no such compoennt for this entity an exception is thrown
+	if there is no such component for this entity an exception is thrown
 	*/
 	auto ref get(P)() @property {
 		enum IDX = staticIndexOf!(P, CS);
