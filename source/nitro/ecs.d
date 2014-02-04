@@ -107,27 +107,49 @@ private:
 	ComponentBits!CS[Entity] _mapEntityComponentBits;
 	EntityComponentPairs!CS _entityComponentPairs;
 
+	Entity[] _deleteLaterEntities;
+	ComponentBits!CS[Entity] _deleteLaterComponents;
+
 public:
+	/************************************************************
+	*/
+	void deleteLater(Entity entity) {
+		this._deleteLaterEntities ~= entity;
+	}
+
+	/************************************************************
+	*/
+	void deleteLater(PCS)(Entity entity) {
+		this._deleteLaterComponents[entity].set!PCS();
+	}
+
+	/************************************************************
+	*/
+	alias clearLater = deleteLater!CS;
+
+	/************************************************************
+	*/
+	void keineAhnung() {
+		foreach(e; this._deleteLaterEntities) {
+			this._destroyEntity(e);
+		}
+		foreach(e; this._deleteLaterComponents) {
+			foreach(C; CS) {
+				if(this._deleteLaterComponents[e].isset!C()) {
+					this._removeComponents!C(e);
+				}
+			}
+		}
+		this._deleteLaterEntities.clear();
+		this._deleteLaterComponents.clear();
+	}
+
 	/************************************************************
 	*/
 	Entity createEntity() {
 		auto e = Entity(_nextId++);
 		_mapEntityComponentBits[e] = ComponentBits!CS();
 		return e;
-	}
-
-	/************************************************************
-	*/
-	void destroyEntity(Entity entity) 
-	in {
-		assert(this.isValid(entity));
-	}
-	out {
-		assert(!this.isValid(entity));
-	}
-	body {
-		this.clearComponents(entity);
-		this._mapEntityComponentBits.remove(entity);
 	}
 	
 	/************************************************************
@@ -143,14 +165,7 @@ public:
 		assert(this.isValid(entity));
 	}
 	body {
-		foreach(PC; PCS) {	
-			alias IDX = staticIndexOf!(PC, CS);
-			assert((entity in this._mapEntityComponentBits) !is null);
-			if(!this._mapEntityComponentBits[entity].isset!PC()) {
-				return false;
-			}
-		}
-		return true;
+		return this._mapEntityComponentBits[entity].isset!PCS();
 	}
 
 	/************************************************************
@@ -169,7 +184,6 @@ public:
 		foreach(i, PC; PCS) {		
 			alias IDX = staticIndexOf!(PC, CS);
 			static assert(IDX != -1, "Component " ~ PC.stringof ~ " not known to ECM");
-			this._mapEntityComponentBits[entity].set!PC();
 
 			auto idx = _entityComponentPairs[IDX].entities.countUntil!(a => a > entity);
 			if(idx != -1) {
@@ -181,34 +195,8 @@ public:
 				_entityComponentPairs[IDX].components ~= pcs[i];
 			}
 		}
+		this._mapEntityComponentBits[entity].set!PCS();
 	}
-	
-	/************************************************************
-	*/
-	void removeComponents(PCS...)(Entity entity)
-	in {
-		assert(this.isValid(entity));
-		assert(this.hasComponents!PCS(entity));
-	}
-	out {
-		assert(!this.hasComponents!PCS(entity));
-	}
-	body {	   
-		import std.algorithm : remove, countUntil;
-		foreach(c, PC; PCS) {
-			alias IDX = staticIndexOf!(PC, CS);
-			this._mapEntityComponentBits[entity].unset!PC();
-
-			auto idx = _entityComponentPairs[IDX].entities.countUntil(entity);
-			if(idx == -1) throw new Exception("entity not found. this should not happen!");
-			_entityComponentPairs[IDX].entities.remove(idx);
-			_entityComponentPairs[IDX].components.remove(idx);
-		}
-	}
-
-	/************************************************************
-	*/
-	alias clearComponents = removeComponents!CS;
 
 	/************************************************************
 	*/
@@ -232,6 +220,47 @@ public:
 		auto entities = this._mapEntityComponentBits.byKey.filter!(e => this.hasComponents!PCS(e))().array.sort;
 		return QueryResult!(typeof(entities), CS)(entities, this._entityComponentPairs);
 	}
+
+private:
+	/************************************************************
+	*/
+	void _destroyEntity(Entity entity) 
+	in {
+		assert(this.isValid(entity));
+	}
+	out {
+		assert(!this.isValid(entity));
+	}
+	body {
+		this.clearComponents(entity);
+		this._mapEntityComponentBits.remove(entity);
+	}
+	
+	/************************************************************
+	*/
+	void _removeComponents(PCS...)(Entity entity)
+	in {
+		assert(this.isValid(entity));
+		assert(this.hasComponents!PCS(entity));
+	}
+	out {
+		assert(!this.hasComponents!PCS(entity));
+	}
+	body {	   
+		import std.algorithm : remove, countUntil;
+		foreach(c, PC; PCS) {
+			alias IDX = staticIndexOf!(PC, CS);
+			auto idx = _entityComponentPairs[IDX].entities.countUntil(entity);
+			if(idx == -1) throw new Exception("entity not found. this should not happen!");
+			_entityComponentPairs[IDX].entities.remove(idx);
+			_entityComponentPairs[IDX].components.remove(idx);
+		}
+		this._mapEntityComponentBits[entity].unset!PCS();
+	}
+	
+	/************************************************************
+	*/
+	alias _clearComponents = _removeComponents!CS;
 }
 
 
