@@ -121,6 +121,10 @@ public:
 	/************************************************************
 	*/
 	void deleteLater(PCS...)(Entity entity) {
+		auto p = entity in this._deleteLaterComponents;
+		if(p is null) {
+			this._deleteLaterComponents[entity] = ComponentBits!CS();
+		}
 		this._deleteLaterComponents[entity].set!PCS();
 	}
 
@@ -131,9 +135,6 @@ public:
 	/************************************************************
 	*/
 	void deleteNow() {
-		foreach(e; this._deleteLaterEntities) {
-			this._destroyEntity(e);
-		}
 		foreach(e; this._deleteLaterComponents.byKey()) {
 			foreach(C; CS) {
 				if(this._deleteLaterComponents[e].isset!C()) {
@@ -141,8 +142,11 @@ public:
 				}
 			}
 		}
-		this._deleteLaterEntities.clear();
+		foreach(e; this._deleteLaterEntities) {
+			this._destroyEntity(e);
+		}
 		this._deleteLaterComponents.clear();
+		this._deleteLaterEntities.clear();
 	}
 
 	/************************************************************
@@ -211,7 +215,7 @@ public:
 		alias IDX = staticIndexOf!(PC, CS);
 		auto idx = this._entityComponentPairs[IDX].entities.countUntil(entity);
 		if(idx == -1) throw new Exception("entity not found. this should not happen!");
-		return this._entityComponentPairs[IDX][idx];
+		return this._entityComponentPairs[IDX].components[idx];
 	}
 
 	/************************************************************

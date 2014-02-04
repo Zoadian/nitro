@@ -29,8 +29,8 @@ ECS is a combination of of the concepts of entities, components and systems. Sys
 
 TODO:
 * EntityComponentManager
-	* deleteLater
-	* clearLater
+	* deleteLater (entities/components)
+	* clearLater 
 	* deleteNow
 	* createEntity
 	* isValid
@@ -68,8 +68,8 @@ All parts of nitro are released under the [Boost software license - version 1.0]
  
 ## Todo
 
-* Enforce no duplicate components
-* Deletion stack for entities and components
+* Finish testing
+* Fix query iteration direction
 * Usage of SoA implementation
 * Unittests
 * Add implementation notes to readme
