@@ -323,8 +323,16 @@ public:
 	*/
 	this() {
 		foreach(s, S; SYSTEMS) {
+
 			static if(__traits(hasMember, S, "__ctor")) {
-				_systems[s] = new S(_ecm);
+				import std.traits : ParameterTypeTuple;
+				alias PARAMETER_LIST = ParameterTypeTuple!(S.__ctor);
+				static if(PARAMETER_LIST.length == 1 && is(PARAMETER_LIST[0] == ECM))
+					_systems[s] = new S(_ecm);
+				else static if(PARAMETER_LIST.length == 0 )
+					_systems[s] = new S();
+				else
+					static assert("Systems can only have constructors of type this() and this(ECM)");
 			}
 			else {		   
 				_systems[s] = new S();
@@ -358,10 +366,10 @@ public:
 	/************************************************************
 	Returns requested system.
 	*/	
-	auto system(alias S)() {			
+	auto system(alias S)() {		
 		enum StringOf(T) = T.stringof;
-		alias IDX = staticIndexOf!(StringOf!(S!ECM), staticMap!(StringOf, ALL_SYSTEMS));
-		static assert(IDX != -1, S!ECM.stringof ~ " is not part of " ~ ALL_SYSTEMS.stringof);
+		alias IDX = staticIndexOf!(StringOf!(S!ECM), staticMap!(StringOf, SYSTEMS));
+		static assert(IDX != -1, S!ECM.stringof ~ " is not part of " ~ SYSTEMS.stringof);
 		return _systems[IDX];
 	}
 }
