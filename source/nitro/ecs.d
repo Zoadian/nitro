@@ -88,13 +88,14 @@ private template EntityComponentPairs(CS...) {
 /****************************************************************
 */
 class EntityComponentManager(CS...) if(CS.length == 0) {
+	void deleteLater(Entity entity) {}
+	void deleteLater(PCS)(Entity entity) {}
+	alias clearLater = deleteLater!CS;
+	void deleteNow() {}
 	Entity createEntity() {return Entity(0);}
-	void destroyEntity(Entity entity) {}
 	bool isValid(Entity entity) const {return false;}
 	bool hasComponents(PCS...)(Entity entity) const {return false;}
 	void addComponents(PCS...)(Entity entity, PCS pcs) {}
-	void removeComponents(PCS...)(Entity entity) {}
-	alias clearComponents = removeComponents!CS;
 	auto getComponent(PC)(Entity entity) {return PC();}
 	auto query(PCS...)() {return QueryResult!(Entity[], CS)([], EntityComponentPairs!CS());}
 }
@@ -129,7 +130,7 @@ public:
 
 	/************************************************************
 	*/
-	void keineAhnung() {
+	void deleteNow() {
 		foreach(e; this._deleteLaterEntities) {
 			this._destroyEntity(e);
 		}
@@ -200,7 +201,7 @@ public:
 
 	/************************************************************
 	*/
-	auto getComponent(PC)(Entity entity)
+	auto ref getComponent(PC)(Entity entity)
 	in {
 		assert(this.isValid(entity));
 		assert(this.hasComponents!PC(entity));
@@ -321,7 +322,7 @@ private:
 	/************************************************************
 	if there is no such component for this entity an exception is thrown
 	*/
-	auto ref get(P)() @property {
+	auto ref getComponent(P)() {
 		enum IDX = staticIndexOf!(P, CS);
 		for(;(*this._pIndices)[IDX] < this._entityComponentPairs[IDX].entities.length; ++((*this._pIndices)[IDX])) {
 			if(this._entityComponentPairs[IDX].entities[(*this._pIndices)[IDX]] == this._e) {

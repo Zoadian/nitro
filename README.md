@@ -29,22 +29,21 @@ ECS is a combination of of the concepts of entities, components and systems. Sys
 
 TODO:
 * EntityComponentManager
+	* deleteLater
+	* clearLater
+	* deleteNow
 	* createEntity
-	* destroyEntity
 	* isValid
 	* hasComponents
 	* addComponents
-	* removeComponents
-	* clearComponents
 	* getComponent
 	* query
-	* <EntityResult -> get>
 
 ### Systems
 
 TODO:
 * SystemManager
-    * <constructors>
+    * ...constructors
     * run
     * system
 
@@ -61,7 +60,7 @@ TODO:
     * AutoQuery
     * AutoQueryMapper
     * pushEntity
-	* <query functions>
+	* ...query functions
 
 ## License
 
