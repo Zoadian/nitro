@@ -219,7 +219,7 @@ public:
 	auto query(PCS...)() {
 		import std.algorithm : filter, sort;
 		auto entities = this._mapEntityComponentBits.byKey.filter!(e => this.hasComponents!PCS(e))().array.sort;
-		return QueryResult!(typeof(entities), CS)(entities, this._entityComponentPairs);
+		return QueryResult!(typeof(entities), CS)(entities, this);
 	}
 
 private:
@@ -271,19 +271,19 @@ struct QueryResult(R, CS...) {
 
 	size_t[CS.length] indices;
 	R _range;
-	EntityComponentPairs!CS _entityComponentPairs;
+	EntityComponentManager!CS _ecm;
 
 	/************************************************************
 	*/
-	this(R range, EntityComponentPairs!CS entityComponentPairs){
+	this(R range, EntityComponentManager!CS ecm){
 		this._range = range;
-		this._entityComponentPairs = entityComponentPairs;
+		this._ecm = ecm;
 	}
 	
 	/************************************************************
 	*/
 	EntityResult!CS front() @property {
-		return EntityResult!CS(_range.front, &indices, this._entityComponentPairs);
+		return EntityResult!CS(_range.front, &indices, _ecm);
 	}
 	
 	/************************************************************
@@ -309,27 +309,33 @@ public:
 
 private:
 	size_t[CS.length]* _pIndices;
-	EntityComponentPairs!CS _entityComponentPairs;
+	EntityComponentManager!CS _ecm;
 
 	/************************************************************
 	*/
-	this(Entity e, size_t[CS.length]* pIndices, EntityComponentPairs!CS entityComponentPairs) {
+	this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm) {
 		this._e = e;
 		this._pIndices = pIndices;
-		this._entityComponentPairs = entityComponentPairs;
+		this._ecm = ecm;
 	}
 		
 	/************************************************************
 	if there is no such component for this entity an exception is thrown
 	*/
-	auto ref getComponent(P)() {
-		enum IDX = staticIndexOf!(P, CS);
-		for(;(*this._pIndices)[IDX] < this._entityComponentPairs[IDX].entities.length; ++((*this._pIndices)[IDX])) {
-			if(this._entityComponentPairs[IDX].entities[(*this._pIndices)[IDX]] == this._e) {
-				return (this._entityComponentPairs[IDX].components[(*this._pIndices)[IDX]]);
+	auto ref getComponent(PCS)() {
+		enum IDX = staticIndexOf!(PCS, CS);
+		for(;(*this._pIndices)[IDX] < _ecm._entityComponentPairs[IDX].entities.length; ++((*this._pIndices)[IDX])) {
+			if(_ecm._entityComponentPairs[IDX].entities[(*this._pIndices)[IDX]] == this._e) {
+				return (_ecm._entityComponentPairs[IDX].components[(*this._pIndices)[IDX]]);
 			}
 		}
 		throw new Exception("no such component for entity");
+	}
+
+	/************************************************************
+	*/
+	bool hasComponent(PCS...)() {
+		return _ecm.hasComponents!PCS(_e);
 	}
 }
 
