@@ -53,6 +53,7 @@ mixin template AutoQueryMapper(alias ECM) {
 		bool AutoQueryFkt() { 
 			bool deleteEntity = false;
 			mixin(IterateQueryFkts!(typeof(this), __traits(getOverloads, typeof(this), "query")));
+			ECM.deleteNow();
 			return true; 
 		}
 	    bool autoQueryFktExecuted = AutoQueryFkt();
@@ -99,7 +100,7 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// Get all components for query
 	foreach(TYPE; TYPES) {
-		code ~= "auto param" ~ TYPE ~ "= e.get!" ~ TYPE ~ "();";
+		code ~= "auto param" ~ TYPE ~ "= e.getComponent!" ~ TYPE ~ "();";
 	}
 
 	// Get return value if bool return
@@ -122,7 +123,7 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// If function returns bool, remove component if true
 	// TODO: destroyEntity instead of removeComponents
-	if(isBool) { code ~= "if(deleteEntity){" ~ ecmIdentifier ~ ".destroyEntity(e); }"; }
+	if(isBool) { code ~= "if(deleteEntity){" ~ ecmIdentifier ~ ".deleteLater(e); }"; }
 
 	// Close entity iteration
 	code ~= "}";

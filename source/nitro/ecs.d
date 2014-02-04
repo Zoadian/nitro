@@ -89,7 +89,7 @@ private template EntityComponentPairs(CS...) {
 */
 class EntityComponentManager(CS...) if(CS.length == 0) {
 	void deleteLater(Entity entity) {}
-	void deleteLater(PCS)(Entity entity) {}
+	void deleteLater(PCS...)(Entity entity) {}
 	alias clearLater = deleteLater!CS;
 	void deleteNow() {}
 	Entity createEntity() {return Entity(0);}
@@ -120,7 +120,7 @@ public:
 
 	/************************************************************
 	*/
-	void deleteLater(PCS)(Entity entity) {
+	void deleteLater(PCS...)(Entity entity) {
 		this._deleteLaterComponents[entity].set!PCS();
 	}
 
@@ -134,7 +134,7 @@ public:
 		foreach(e; this._deleteLaterEntities) {
 			this._destroyEntity(e);
 		}
-		foreach(e; this._deleteLaterComponents) {
+		foreach(e; this._deleteLaterComponents.byKey()) {
 			foreach(C; CS) {
 				if(this._deleteLaterComponents[e].isset!C()) {
 					this._removeComponents!C(e);
@@ -233,7 +233,7 @@ private:
 		assert(!this.isValid(entity));
 	}
 	body {
-		this.clearComponents(entity);
+		this._clearComponents(entity);
 		this._mapEntityComponentBits.remove(entity);
 	}
 	
