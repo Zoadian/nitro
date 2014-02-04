@@ -242,7 +242,6 @@ private:
 	void _removeComponents(PCS...)(Entity entity)
 	in {
 		assert(this.isValid(entity));
-		assert(this.hasComponents!PCS(entity));
 	}
 	out {
 		assert(!this.hasComponents!PCS(entity));
@@ -252,9 +251,10 @@ private:
 		foreach(c, PC; PCS) {
 			alias IDX = staticIndexOf!(PC, CS);
 			auto idx = _entityComponentPairs[IDX].entities.countUntil(entity);
-			if(idx == -1) throw new Exception("entity not found. this should not happen!");
-			_entityComponentPairs[IDX].entities.remove(idx);
-			_entityComponentPairs[IDX].components.remove(idx);
+			if(idx != -1) {
+				_entityComponentPairs[IDX].entities.remove(idx);
+				_entityComponentPairs[IDX].components.remove(idx);
+			}
 		}
 		this._mapEntityComponentBits[entity].unset!PCS();
 	}
