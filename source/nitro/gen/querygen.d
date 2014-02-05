@@ -10,11 +10,12 @@ module nitro.gen.querygen;
 
 //---------------------------------------------------------------------------------------------------
 
-void pushEntity(ECM, ARGS...)(ECM ecm, ARGS args) {
+auto pushEntity(ECM, ARGS...)(ECM ecm, ARGS args) {
 	auto e = ecm.createEntity();
 	foreach(arg;args) {
         ecm.addComponents(e, arg);
 	}
+    return e;
 }
 
 //---------------------------------------------------------------------------------------------------
@@ -86,7 +87,6 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 		alias TYPES = TYPES_WITHOUT_ECM;
     }
 
-
 	// Generate list of types
 	string typeList = "";
 	foreach(TYPE; TYPES) {
@@ -95,13 +95,7 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 	}
 
 	// Start loop over all entities
-	// Todo: remove array and sort from implementation once ECM is improved
 	code ~= "foreach(e;" ~ ecmIdentifier ~ ".query!(" ~ typeList ~ ")()){";
-
-	// Get all components for query
-	foreach(TYPE; TYPES) {
-		code ~= "auto param" ~ TYPE ~ "= e.getComponent!" ~ TYPE ~ "();";
-	}
 
 	// Get return value if bool return
 	if(isBool) { code ~= "deleteEntity="; }
@@ -117,12 +111,11 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// Supply all component parameters
 	foreach(i, TYPE; TYPES) {
-		code ~= "param" ~ TYPE;
+        code ~= "e.getComponent!" ~ TYPE ~ "()";
 		code ~= (i < (TYPES.length-1)) ? "," : ");";
 	}
 
 	// If function returns bool, remove component if true
-	// TODO: destroyEntity instead of removeComponents
 	if(isBool) { code ~= "if(deleteEntity){" ~ ecmIdentifier ~ ".deleteLater(e); }"; }
 
 	// Close entity iteration
@@ -167,7 +160,7 @@ version(none) {
 						__traits(getOverloads, typeof(this), "query")[i](*CALL_LIST[0]());
 					}
 					else {
-						static assert(0, "u suck hard");
+						static assert(0, "Something is bad");
 					}
 				}
 			}	

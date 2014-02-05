@@ -100,7 +100,7 @@ class EntityComponentManager(CS...) if(CS.length == 0) {
 	bool isValid(Entity entity) const {return false;}
 	bool hasComponents(PCS...)(Entity entity) const {return false;}
 	void addComponents(PCS...)(Entity entity, PCS pcs) {}
-	auto ref getComponent(PC)(Entity entity) {return PC();}
+	ref PC getComponent(PC)(Entity entity) {return *(new PC());}
 	auto query(PCS...)() {return QueryResult!(Entity[], CS)([], this);} 
 }
 
@@ -209,7 +209,7 @@ public:
 
 	/************************************************************
 	*/
-	auto ref getComponent(PC)(Entity entity)
+	ref PC getComponent(PC)(Entity entity)
 	in {
 		assert(this.isValid(entity));
 		assert(this.hasComponents!PC(entity));
@@ -314,7 +314,7 @@ struct EntityResult(CS...) if(CS.length == 0) {
     Entity _e = Entity(0);
     alias _e this;
     this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm){}
-    auto ref getComponent(PCS)() { return PCS(); }
+    ref PCS getComponent(PCS)() { return *(new PCS()); }
     bool hasComponent(PCS...)() { return false; }
 
 }
@@ -342,11 +342,11 @@ private:
 	/************************************************************
 	if there is no such component for this entity an exception is thrown
 	*/
-	auto ref getComponent(PCS)() {
+	ref PCS getComponent(PCS)() {
 		enum IDX = staticIndexOf!(PCS, CS);
 		for(;(*this._pIndices)[IDX] < _ecm._entityComponentPairs[IDX].entities.length; ++((*this._pIndices)[IDX])) {
 			if(_ecm._entityComponentPairs[IDX].entities[(*this._pIndices)[IDX]] == this._e) {
-				return (_ecm._entityComponentPairs[IDX].components[(*this._pIndices)[IDX]]);
+				return _ecm._entityComponentPairs[IDX].components[(*this._pIndices)[IDX]];
 			}
 		}
 		throw new Exception("no such component for entity");
