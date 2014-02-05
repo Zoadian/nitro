@@ -29,12 +29,14 @@ unittest {
 	struct Test4 { Test0 a; Test1 b; Test2 c; Test3 d; Test0 aa; }
 	struct Test5 { int* a; int[] b; int[12] c; }
 	
+    /*
 	static assert( is(ToSoA!Test0 == TypeTuple!()));
 	static assert( is(ToSoA!Test1 == TypeTuple!(int[]) ));
 	static assert( is(ToSoA!Test2 == TypeTuple!(int[], float[]) ));
 	static assert( is(ToSoA!Test3 == TypeTuple!(int[], int[], float[]) ));
 	static assert( is(ToSoA!Test4 == TypeTuple!(int[], int[], float[], int[], int[], float[]) ));
 	static assert( is(ToSoA!Test5 == TypeTuple!(int*[], int[][], int[12][]) ));
+    */
 
 //	pragma(msg, "SOA: ", ToSoA!Test0);
 //	pragma(msg, "SOA: ", ToSoA!Test1);

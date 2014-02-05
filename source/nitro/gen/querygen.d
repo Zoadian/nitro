@@ -174,3 +174,16 @@ version(none) {
 		}
 	}
 }
+
+//###################################################################################################
+
+version(unittest) {
+
+}
+
+unittest {
+    import std.stdio : writeln; 
+    writeln("################## GEN.QUERYGEN UNITTEST START ##################");
+    writeln("TODO: ADD UNITTEST");
+    writeln("################## GEN.QUERYGEN UNITTEST STOP  ##################");
+}

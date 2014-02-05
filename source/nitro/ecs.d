@@ -430,3 +430,299 @@ public:
 	}
 }
 
+//###################################################################################################
+
+version(unittest) {
+    static bool bCheckSystemOneConstructor = false;
+    static bool bCheckSystemTwoConstructor = false;
+
+    static int runCountSystemOne = 0;
+    static int runCountSystemTwo = 0;
+
+    final class SystemOne(ECM) {
+        string _identifier;
+
+        this() {
+            _identifier = "SystemOne";
+            bCheckSystemOneConstructor = true;
+        }
+
+        void run(ECM ecm) {
+            runCountSystemOne++;
+
+            int countComponentThreeFound = 0;
+            foreach(e; ecm.query!ComponentThree()) {
+                assert(runCountSystemOne == 2);
+                countComponentThreeFound++;
+
+                ecm.deleteLater!ComponentThree(e);
+                ecm.deleteLater(e);
+
+                ecm.addComponents(ecm.createEntity(), ComponentOne(10,"a",true), ComponentThree());
+                ecm.addComponents(ecm.createEntity(), ComponentTwo(11,"b",false), ComponentThree());
+            }
+
+            if(runCountSystemOne == 2) { 
+                assert(countComponentThreeFound == 1); 
+            }
+            else {
+                assert(countComponentThreeFound == 0); 
+            }
+
+            ecm.deleteNow();
+        }
+    }
+
+    final class SystemTwo(ECM) {
+        ECM _ecm;
+        string _identifier;
+
+        this(ECM ecm) {
+            _identifier = "SystemTwo";
+            _ecm = ecm;
+            bCheckSystemTwoConstructor = true;
+        }
+
+        void run(ECM ecm) {
+            runCountSystemTwo++;
+
+            int countComponentThreeFound = 0;
+            foreach(e; ecm.query!ComponentThree()) {
+                assert(runCountSystemOne == 2);
+                countComponentThreeFound++;
+
+                Entity en = e;
+                if(e.hasComponent!ComponentOne()) {
+                    assert(!e.hasComponent!ComponentTwo());
+                    auto component = e.getComponent!ComponentOne();
+                    if(runCountSystemOne == 2) { assert(en.id == 5 && component.FieldOne == 10 && component.FieldTwo == "a" && component.FieldThree == true); }
+                }
+                if(e.hasComponent!ComponentTwo()) {
+                    assert(!e.hasComponent!ComponentOne());
+                    auto component = e.getComponent!ComponentTwo();
+                    if(runCountSystemOne == 2) { assert(en.id == 6 && component.FieldOne == 11 && component.FieldTwo == "b" && component.FieldThree == false); }
+                }
+                ecm.clearLater(e);
+            }
+
+            if(runCountSystemOne == 2) { 
+                assert(countComponentThreeFound == 2); 
+            }
+            else {
+                assert(countComponentThreeFound == 0); 
+            }
+
+
+            ecm.deleteNow();
+        }
+    }
+
+    struct ComponentOne {
+        int FieldOne;
+        string FieldTwo;
+        bool FieldThree;
+    }
+
+    struct ComponentTwo { 
+        int FieldOne;
+        string FieldTwo;
+        bool FieldThree;
+    }
+
+    struct ComponentThree {
+
+    }
+}
+
+unittest {
+	import std.typetuple : TypeTuple;
+    import std.stdio : writeln; 
+    writeln("################## ECS UNITTEST START ##################");
+
+	alias TEST_SYSTEMS = TypeTuple!(SystemOne, SystemTwo);
+	alias TEST_COMPONENTS = TypeTuple!(ComponentOne, ComponentTwo, ComponentThree);
+
+	alias TEST_ECM = EntityComponentManager!(TEST_COMPONENTS);
+	alias TEST_ECS = SystemManager!(TEST_ECM, TEST_SYSTEMS);
+
+	// Test system functions
+	TEST_ECS test_ecs = new TEST_ECS();
+
+    assert(bCheckSystemOneConstructor);
+    assert(bCheckSystemTwoConstructor);
+
+	auto system_one = test_ecs.system!SystemOne();
+	auto system_two = test_ecs.system!SystemTwo();
+
+    assert(system_one._identifier == "SystemOne");
+    assert(system_two._identifier == "SystemTwo");
+
+    assert(runCountSystemOne == 0);
+    assert(runCountSystemTwo == 0);
+
+	test_ecs.run();
+
+    assert(runCountSystemOne == 1);
+    assert(runCountSystemTwo == 1);
+
+	// Test entity/component functions
+	auto test_ecm = test_ecs.ecm;
+
+	Entity entity_one = test_ecm.createEntity();
+	Entity entity_two = test_ecm.createEntity();
+	Entity entity_three = test_ecm.createEntity();
+
+    assert(test_ecm.isValid(entity_one));
+    assert(test_ecm.isValid(entity_two));
+    assert(test_ecm.isValid(entity_three));
+
+	test_ecm.deleteLater(entity_three);
+	test_ecm.deleteNow();
+
+    assert(test_ecm.isValid(entity_one));
+    assert(test_ecm.isValid(entity_two));
+    assert(!test_ecm.isValid(entity_three));
+
+	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
+	assert(!test_ecm.hasComponents!ComponentTwo(entity_two));
+
+	test_ecm.addComponents(entity_one, ComponentOne(1, "hi", true));
+
+	assert(test_ecm.hasComponents!ComponentOne(entity_one));
+	assert(!test_ecm.hasComponents!ComponentTwo(entity_one)); 
+	assert(!test_ecm.hasComponents!ComponentOne(entity_two)); 
+	assert(!test_ecm.hasComponents!ComponentTwo(entity_two)); 
+
+	assert(!test_ecm.hasComponents!(ComponentOne,ComponentTwo)(entity_one));
+
+	test_ecm.deleteLater!ComponentOne(entity_one);
+	test_ecm.deleteNow();
+
+	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
+	assert(!test_ecm.hasComponents!ComponentTwo(entity_one));
+	assert(!test_ecm.hasComponents!ComponentOne(entity_two));
+	assert(!test_ecm.hasComponents!ComponentTwo(entity_two));
+
+	test_ecm.addComponents(entity_two, ComponentOne(2, "ho", false));
+	test_ecm.addComponents(entity_two, ComponentTwo(3, "lets", true));
+
+	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
+	assert(!test_ecm.hasComponents!ComponentTwo(entity_one));
+	assert(test_ecm.hasComponents!ComponentOne(entity_two));
+	assert(test_ecm.hasComponents!ComponentTwo(entity_two));
+
+	test_ecm.addComponents(entity_one, ComponentOne(4, "go", false));
+	test_ecm.addComponents(entity_one, ComponentTwo(5, "this", true));
+
+	assert(test_ecm.hasComponents!ComponentOne(entity_one));
+	assert(test_ecm.hasComponents!ComponentTwo(entity_one));
+	assert(test_ecm.hasComponents!ComponentOne(entity_two));
+	assert(test_ecm.hasComponents!ComponentTwo(entity_two));
+
+	assert(test_ecm.hasComponents!(ComponentOne,ComponentTwo)(entity_one));
+	assert(test_ecm.hasComponents!(ComponentOne,ComponentTwo)(entity_two));
+
+	auto component_one = test_ecm.getComponent!ComponentOne(entity_one);
+    assert(component_one.FieldOne == 1 && component_one.FieldTwo == "hi" && component_one.FieldThree == true);
+
+	Entity entity_four = test_ecm.createEntity();
+	test_ecm.addComponents(entity_four, ComponentOne(6, "is", false));
+	test_ecm.addComponents(entity_four, ComponentTwo(6, "my", true));
+    test_ecm.deleteLater(entity_four);
+
+	Entity lastEntity = Entity(size_t.max);
+    int currentIteration = 1;
+	foreach(e; test_ecm.query!(ComponentOne, ComponentTwo)()) {
+        assert(currentIteration <= 3);
+
+		assert(e.hasComponent!ComponentOne());
+		assert(e.hasComponent!ComponentTwo());
+
+		auto component = e.getComponent!ComponentOne();
+		Entity en = cast(Entity)e;
+        if(currentIteration == 1) { assert(en.id == 0 && component.FieldOne == 1 && component.FieldTwo == "hi" && component.FieldThree == true); }
+        if(currentIteration == 2) { assert(en.id == 1 && component.FieldOne == 2 && component.FieldTwo == "ho" && component.FieldThree == false); }
+        if(currentIteration == 3) { assert(en.id == 3 && component.FieldOne == 6 && component.FieldTwo == "is" && component.FieldThree == false); }
+
+		auto componenttwo = e.getComponent!ComponentTwo();
+		Entity entwo = cast(Entity)e;
+        if(currentIteration == 1) { assert(entwo.id == 0 && componenttwo.FieldOne == 5 && componenttwo.FieldTwo == "this" && componenttwo.FieldThree == true); }
+        if(currentIteration == 2) { assert(entwo.id == 1 && componenttwo.FieldOne == 3 && componenttwo.FieldTwo == "lets" && componenttwo.FieldThree == true); }
+        if(currentIteration == 3) { assert(entwo.id == 3 && componenttwo.FieldOne == 6 && componenttwo.FieldTwo == "my" && componenttwo.FieldThree == true); }
+
+        assert(en == entwo);
+		if(lastEntity != Entity(size_t.max)) {
+            assert(!(lastEntity.id > en.id));
+		}
+		lastEntity = en;
+        currentIteration++;
+	}
+
+	test_ecm.deleteLater!ComponentTwo(entity_one);
+	test_ecm.deleteLater!ComponentOne(entity_two);
+	test_ecm.deleteNow();
+
+    int currentIterationTwo = 1;
+	foreach(e; test_ecm.query!ComponentOne()) {
+        assert(currentIterationTwo <= 2);
+
+		assert(e.hasComponent!ComponentOne()); 
+		assert(!e.hasComponent!ComponentTwo());
+
+		auto component = e.getComponent!ComponentOne();
+		Entity en = e;
+        if(currentIterationTwo == 1) { assert(en.id == 0 && component.FieldOne == 1 && component.FieldTwo == "hi" && component.FieldThree == true); }
+        if(currentIterationTwo == 2) { assert(en.id == 1 && component.FieldOne == 3 && component.FieldTwo == "lets" && component.FieldThree == true); }
+        currentIterationTwo++;
+	}
+
+    int currentIterationThree = 1;
+	foreach(e; test_ecm.query!ComponentTwo()) {
+        assert(currentIterationThree <= 1);
+		assert(!e.hasComponent!ComponentOne());
+		assert(e.hasComponent!ComponentTwo());
+
+		auto component = e.getComponent!ComponentTwo();
+		Entity en = e;
+        if(currentIterationThree == 1) { assert(en.id == 1 && component.FieldOne == 3 && component.FieldTwo == "lets" && component.FieldThree == true); }
+        currentIterationThree++;
+	}
+
+	assert(test_ecm.hasComponents!ComponentOne(entity_one)) ;
+	assert(!test_ecm.hasComponents!ComponentTwo(entity_one));
+	assert(!test_ecm.hasComponents!ComponentOne(entity_two));
+	assert(test_ecm.hasComponents!ComponentTwo(entity_two)) ;
+
+	assert(test_ecm.isValid(entity_one));
+	assert(test_ecm.isValid(entity_two));
+
+	test_ecm.deleteLater!ComponentOne(entity_one);
+	test_ecm.deleteLater!ComponentTwo(entity_two);
+	test_ecm.deleteNow();
+
+	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
+	assert(!test_ecm.hasComponents!ComponentTwo(entity_one));
+	assert(!test_ecm.hasComponents!ComponentOne(entity_two));
+	assert(!test_ecm.hasComponents!ComponentTwo(entity_two));
+
+	test_ecm.deleteLater(entity_one);
+	test_ecm.deleteLater(entity_two);
+	test_ecm.deleteNow();
+
+	assert(!test_ecm.isValid(entity_one));
+	assert(!test_ecm.isValid(entity_two));
+
+	Entity entity_emitter = test_ecm.createEntity();
+	test_ecm.addComponents(entity_emitter, ComponentThree());
+
+	test_ecs.run();
+    assert(runCountSystemOne == 2);
+    assert(runCountSystemTwo == 2);
+
+	test_ecs.run();
+    assert(runCountSystemOne == 3);
+    assert(runCountSystemTwo == 3);
+
+    writeln("################## ECS UNITTEST STOP  ##################");
+}
+

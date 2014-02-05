@@ -110,3 +110,16 @@ mixin template MakeECS(string SYMBOL_NAME, string MODULE_LIST) {
 	alias ECS = SystemManager!(EntityComponentManager!Components, Systems);
 	mixin("ECS " ~ SYMBOL_NAME ~ " = new ECS();");
 }
+
+//###################################################################################################
+
+version(unittest) {
+
+}
+
+unittest {
+    import std.stdio : writeln; 
+    writeln("################## GEN.ECSGEN UNITTEST START ##################");
+    writeln("TODO: ADD UNITTEST");
+    writeln("################## GEN.ECSGEN UNITTEST STOP  ##################");
+}

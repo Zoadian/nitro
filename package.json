@@ -8,5 +8,14 @@
 		"Paul Freund"
 	],
 	
-	"targetType": "sourceLibrary"
+	"targetType": "sourceLibrary",
+	
+	"configurations": [
+		{
+			"name" : "unittest",
+			"dflags": ["-main"],
+			"buildOptions": ["unittests"],
+			"targetType": "executable"
+		}
+	]
 }
