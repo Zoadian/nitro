@@ -74,7 +74,7 @@ mixin template ComponentSystemLookup() {
 /**
 MakeECS
 */
-mixin template MakeECS(string T) {					
+mixin template MakeECS(string SYMBOL_NAME, string MODULE_LIST) {					
 
 	mixin ComponentSystemLookup;
 	string c(string s...) {
@@ -105,8 +105,8 @@ mixin template MakeECS(string T) {
 		return res;
 	}
 	//pragma(msg, c(T));
-	mixin(c(T));
+	mixin(c(MODULE_LIST));
 
 	alias ECS = SystemManager!(EntityComponentManager!Components, Systems);
-	ECS ecs = new ECS();
+	mixin("ECS " ~ SYMBOL_NAME ~ " = new ECS();");
 }
