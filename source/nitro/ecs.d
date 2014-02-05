@@ -96,12 +96,12 @@ class EntityComponentManager(CS...) if(CS.length == 0) {
 	void deleteLater(PCS...)(Entity entity) {}
 	alias clearLater = deleteLater!CS;
 	void deleteNow() {}
-	Entity createEntity() {return Entity(0);}
-	bool isValid(Entity entity) const {return false;}
-	bool hasComponents(PCS...)(Entity entity) const {return false;}
+	Entity createEntity() { assert(0); }
+	bool isValid(Entity entity) const { assert(0); }
+	bool hasComponents(PCS...)(Entity entity) const { assert(0); }
 	void addComponents(PCS...)(Entity entity, PCS pcs) {}
-	ref PC getComponent(PC)(Entity entity) {return *(new PC());}
-	auto query(PCS...)() {return QueryResult!(Entity[], CS)([], this);} 
+	ref PC getComponent(PC)(Entity entity) { assert(0); }
+	QueryResult!(Entity[], CS) query(PCS...)() { assert(0); }
 }
 
 /****************************************************************
@@ -314,11 +314,10 @@ struct EntityResult(CS...) if(CS.length == 0) {
     Entity _e = Entity(0);
     alias _e this;
     this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm){}
-    ref PCS getComponent(PCS)() { return *(new PCS()); }
-    bool hasComponent(PCS...)() { return false; }
+    ref PCS getComponent(PCS)() { assert(0); }
+    bool hasComponent(PCS...)() { assert(0); }
 
 }
-
 
 /****************************************************************
 */
