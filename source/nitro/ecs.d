@@ -12,9 +12,13 @@ import nitro.soa;
 */
 struct Entity { 
 	size_t id; 
-
 	int opCmp(ref const Entity entity) const {
-		return id < entity.id;
+        if(this.id < entity.id)
+            return -1;
+        else if(entity.id < this.id)
+            return 1;
+
+        return 0;
 	}
 }
 
@@ -96,8 +100,8 @@ class EntityComponentManager(CS...) if(CS.length == 0) {
 	bool isValid(Entity entity) const {return false;}
 	bool hasComponents(PCS...)(Entity entity) const {return false;}
 	void addComponents(PCS...)(Entity entity, PCS pcs) {}
-	auto getComponent(PC)(Entity entity) {return PC();}
-	auto query(PCS...)() {return QueryResult!(Entity[], CS)([], EntityComponentPairs!CS());}
+	auto ref getComponent(PC)(Entity entity) {return PC();}
+	auto query(PCS...)() {return QueryResult!(Entity[], CS)([], this);} 
 }
 
 /****************************************************************
@@ -306,7 +310,19 @@ struct QueryResult(R, CS...) {
 
 /****************************************************************
 */
-struct EntityResult(CS...) {
+struct EntityResult(CS...) if(CS.length == 0) {
+    Entity _e = Entity(0);
+    alias _e this;
+    this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm){}
+    auto ref getComponent(PCS)() { return PCS(); }
+    bool hasComponent(PCS...)() { return false; }
+
+}
+
+
+/****************************************************************
+*/
+struct EntityResult(CS...) if(CS.length > 0) {
 public:
 	Entity _e;
 	alias _e this;

@@ -69,7 +69,6 @@ All parts of nitro are released under the [Boost software license - version 1.0]
 ## Todo
 
 * Finish testing
-* Fix query iteration direction
 * Usage of SoA implementation
 * Unittests
 * Add implementation notes to readme
