@@ -104,7 +104,7 @@ mixin template MakeECS(string SYMBOL_NAME, string MODULE_LIST) {
 
 		return res;
 	}
-	//pragma(msg, c(T));
+	//pragma(msg, c(MODULE_LIST));
 	mixin(c(MODULE_LIST));
 
 	alias ECS = SystemManager!(EntityComponentManager!Components, Systems);
@@ -114,12 +114,76 @@ mixin template MakeECS(string SYMBOL_NAME, string MODULE_LIST) {
 //###################################################################################################
 
 version(unittest) {
+    @System final class SystemOne(ECM) {
+        void run(ECM ecm) {
+            foreach(e; ecm.query!ComponentTwo()) {
+                assert(false);
+            }
+            foreach(e; ecm.query!ComponentOne()) {
+                auto component = e.getComponent!ComponentOne();
+                assert(component.token == "CheckpointOne");
+                ecm.deleteLater!ComponentOne(e);
+                ecm.addComponents(e, ComponentTwo("CheckpointTwo"));
+            }
 
+            ecm.deleteNow();
+        }
+    }
+
+
+    @System final class SystemTwo(ECM) {
+        void run(ECM ecm) {
+            foreach(e; ecm.query!ComponentOne()) {
+                assert(false);
+            }
+            foreach(e; ecm.query!ComponentTwo()) {
+                auto component = e.getComponent!ComponentTwo();
+                assert(component.token == "CheckpointTwo");
+                ecm.deleteLater!ComponentTwo(e);
+                ecm.addComponents(e, ComponentThree("CheckpointThree"));
+            }
+            ecm.deleteNow();
+        }
+    }
+
+    @Component struct ComponentOne {
+        string token;
+    }
+
+    @Component struct ComponentTwo {
+        string token;
+    }
+
+    @Component struct ComponentThree {
+        string token;
+    }
 }
 
 unittest {
     import std.stdio : writeln; 
     writeln("################## GEN.ECSGEN UNITTEST START ##################");
-    writeln("TODO: ADD UNITTEST");
+
+	// Test gen ecs functionality
+	mixin MakeECS!("autoECS", "nitro.gen.ecsgen");
+
+	Entity entity = autoECS.ecm.createEntity();
+    autoECS.ecm.addComponents(entity, ComponentOne("CheckpointOne"));
+
+	autoECS.run();
+
+    foreach(e; autoECS.ecm.query!ComponentOne()) {
+        assert(false);
+    }
+    foreach(e; autoECS.ecm.query!ComponentTwo()) {
+        assert(false);
+    }
+    foreach(e; autoECS.ecm.query!ComponentTwo()) {
+        auto component = e.getComponent!ComponentThree();
+        assert(component.token == "CheckpointThree");
+        autoECS.ecm.deleteLater!ComponentThree(e);
+    }
+
+    autoECS.ecm.deleteNow();
+
     writeln("################## GEN.ECSGEN UNITTEST STOP  ##################");
 }
