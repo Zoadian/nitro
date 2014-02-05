@@ -171,12 +171,149 @@ version(none) {
 //###################################################################################################
 
 version(unittest) {
+    import nitro;
+    @Component struct ComponentOne { string message; }
+    @Component struct ComponentTwo { string message; }
+    @Component struct ComponentThree { string message; }
+    @Component struct ComponentFour { string message; }
 
+    @Component struct ComponentFive { string message; }
+    @Component struct ComponentSix { string message; }
+
+    @System final class SystemOne(ECM) {
+
+        void run(ECM ecm) {
+            mixin AutoQueryMapper!ecm;
+        }
+
+        void query(ref ComponentOne c) {
+            assert(c.message == "CheckSum: ");
+            c.message ~= "VC;";
+        }
+
+        void query(ECM m, ref ComponentOne c) {
+            assert(c.message == "CheckSum: VC;");
+            c.message ~= "VMC;";
+        }
+
+        void query(Entity e, ref ComponentOne c) {
+            assert(e == Entity(0));
+            assert(c.message == "CheckSum: VC;VMC;");
+            c.message ~= "VEC;";
+        }
+
+        void query(ECM m, Entity e, ref ComponentOne c) {
+            assert(e == Entity(0));
+            assert(c.message == "CheckSum: VC;VMC;VEC;");
+            c.message ~= "VMEC;";
+        }
+
+        void query(ref ComponentThree c, ref ComponentFour c2) {
+            assert(c.message == "Check: ");
+            assert(c2.message == "Sum: ");
+            c.message ~= "VCC;";
+            c2.message ~= "VCC;";
+        }
+
+        void query(ECM m, ref ComponentThree c, ref ComponentFour c2) {
+            assert(c.message == "Check: VCC;");
+            assert(c2.message == "Sum: VCC;");
+            c.message ~= "VMCC;";
+            c2.message ~= "VMCC;";
+        }
+
+        void query(Entity e, ref ComponentThree c, ref ComponentFour c2) {
+            assert(e == Entity(2));
+            assert(c.message == "Check: VCC;VMCC;");
+            assert(c2.message == "Sum: VCC;VMCC;");
+            c.message ~= "VECC;";
+            c2.message ~= "VECC;";
+        }
+
+        void query(ECM m, Entity e, ref ComponentThree c, ref ComponentFour c2) {
+            assert(e == Entity(2));
+            assert(c.message == "Check: VCC;VMCC;VECC;");
+            assert(c2.message == "Sum: VCC;VMCC;VECC;");
+            c.message ~= "VMECC;";
+            c2.message ~= "VMECC;";
+        }
+    }
+
+    @System final class SystemTwo(ECM) {
+
+        mixin AutoQuery;
+
+        bool query(ref ComponentOne c) {
+            assert(c.message == "CheckSum: VC;VMC;VEC;VMEC;");
+            c.message ~= "2VC;";
+            return false;
+        }
+
+        bool query(ref ComponentThree c, ref ComponentFour c2) {
+            assert(c.message == "Check: VCC;VMCC;VECC;VMECC;");
+            assert(c2.message == "Sum: VCC;VMCC;VECC;VMECC;");
+            c.message ~= "2VCC;";
+            c2.message ~= "2VCC;";
+            return false;
+        }
+
+        bool query(ref ComponentTwo c) {
+            assert(c.message == "DeleteThis");
+            return true;
+        }
+
+        bool query(ref ComponentFive c, ComponentSix c2) {
+            assert(c.message == "Delete");
+            assert(c2.message == "This");
+            return true;
+        }
+    }
 }
 
 unittest {
     import std.stdio : writeln; 
     writeln("################## GEN.QUERYGEN UNITTEST START ##################");
-    writeln("TODO: ADD UNITTEST");
+
+	// Test gen ecs functionality
+	mixin MakeECS!("autoECS", "nitro.gen.querygen");
+
+    Entity e = autoECS.ecm.pushEntity(ComponentOne("CheckSum: "));
+
+    autoECS.run();
+
+    auto component = autoECS.ecm.getComponent!ComponentOne(e);
+    assert(component.message == "CheckSum: VC;VMC;VEC;VMEC;2VC;");
+
+    autoECS.ecm.deleteLater(e);
+    autoECS.ecm.deleteNow();
+
+    Entity e2 = autoECS.ecm.pushEntity(ComponentTwo("DeleteThis"));
+
+    autoECS.run();
+
+    assert(!autoECS.ecm.isValid(e));
+    assert(!autoECS.ecm.isValid(e2));
+
+    Entity e3 = autoECS.ecm.pushEntity(ComponentThree("Check: "), ComponentFour("Sum: "));
+
+    autoECS.run();
+
+    auto componentThree = autoECS.ecm.getComponent!ComponentThree(e3);
+    auto componentFour = autoECS.ecm.getComponent!ComponentFour(e3);
+    assert(componentThree.message == "Check: VCC;VMCC;VECC;VMECC;2VCC;");
+    assert(componentFour.message == "Sum: VCC;VMCC;VECC;VMECC;2VCC;");
+
+    autoECS.ecm.deleteLater(e3);
+    autoECS.ecm.deleteNow();
+
+    Entity e4 = autoECS.ecm.pushEntity(ComponentFive("Delete"), ComponentSix("This"));
+
+    autoECS.run();
+
+    assert(!autoECS.ecm.isValid(e));
+    assert(!autoECS.ecm.isValid(e2));
+    assert(!autoECS.ecm.isValid(e3));
+    assert(!autoECS.ecm.isValid(e4));
+
     writeln("################## GEN.QUERYGEN UNITTEST STOP  ##################");
 }
