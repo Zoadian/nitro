@@ -29,15 +29,15 @@ ECS is a combination of of the concepts of entities, components and systems. Sys
 
 TODO:
 * EntityComponentManager
-	* deleteLater (entities/components)
-	* clearLater 
-	* deleteNow
-	* createEntity
-	* isValid
-	* hasComponents
-	* addComponents
-	* getComponent
-	* query
+    * deleteLater (entities/components)
+    * clearLater 
+    * deleteNow
+    * createEntity
+    * isValid
+    * hasComponents
+    * addComponents
+    * getComponent
+    * query
 
 ### Systems
 
@@ -54,13 +54,13 @@ TODO:
 TODO:
 * ecsgen
     * MakeECS
-	* SystemsOfModule
-	* ComponentsOfModule
+    * SystemsOfModule
+    * ComponentsOfModule
 * querygen
     * AutoQuery
     * AutoQueryMapper
     * pushEntity
-	* ...query functions
+    * ...query functions
 
 ## License
 
@@ -68,13 +68,7 @@ All parts of nitro are released under the [Boost software license - version 1.0]
  
 ## Todo
 
-* Finish testing
+* Finish readme
 * Usage of SoA implementation
-* Unittests
 * Add implementation notes to readme
 * Release of first major release (1.0.0)
-
-
-
-
-
