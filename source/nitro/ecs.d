@@ -78,7 +78,7 @@ private:
 */
 private struct EntityComponentPair(C) {
 	Entity[] entities; 
-	C[] components;
+	SoAArray!C components;
 };
 
 

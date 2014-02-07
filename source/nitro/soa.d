@@ -22,28 +22,24 @@ template ToSoA(T) {
 	alias ToSoA = staticMap!(_ToDynamicArray, _FIELDS);
 }
 unittest {
-	struct Test0 { char a; }
+    import std.stdio : writeln; 
+    writeln("################## SOA UNITTEST START ##################");
+
+	struct Test0 { }
 	struct Test1 { int a; }
 	struct Test2 { int a; float b; }
 	struct Test3 { Test0 a; Test1 b; Test2 c; }
 	struct Test4 { Test0 a; Test1 b; Test2 c; Test3 d; Test0 aa; }
 	struct Test5 { int* a; int[] b; int[12] c; }
 	
-    /*
 	static assert( is(ToSoA!Test0 == TypeTuple!()));
 	static assert( is(ToSoA!Test1 == TypeTuple!(int[]) ));
 	static assert( is(ToSoA!Test2 == TypeTuple!(int[], float[]) ));
 	static assert( is(ToSoA!Test3 == TypeTuple!(int[], int[], float[]) ));
 	static assert( is(ToSoA!Test4 == TypeTuple!(int[], int[], float[], int[], int[], float[]) ));
 	static assert( is(ToSoA!Test5 == TypeTuple!(int*[], int[][], int[12][]) ));
-    */
 
-//	pragma(msg, "SOA: ", ToSoA!Test0);
-//	pragma(msg, "SOA: ", ToSoA!Test1);
-//	pragma(msg, "SOA: ", ToSoA!Test2);
-//	pragma(msg, "SOA: ", ToSoA!Test3);
-//	pragma(msg, "SOA: ", ToSoA!Test4);
-//	pragma(msg, "SOA: ", ToSoA!Test5);	
+    writeln("################## SOA UNITTEST STOP  ##################");
 }
 
 
@@ -92,7 +88,7 @@ struct Accessor(T) {
 	
 	pragma(msg, _gen());
 	mixin(_gen());
-	
+	/*
 	void test(){
 		import std.stdio;
 		foreach(ref x; _pData) {
@@ -100,6 +96,7 @@ struct Accessor(T) {
 			(*x)[_idx].writeln();
 		}
 	}
+	*/
 }
 
 
@@ -110,11 +107,6 @@ import std.traits : RepresentationTypeTuple, FieldTypeTuple;
 
 
 
-
-
-
-
-
 /**
 Implements an 'Structure of Arrays' Array.
 */
@@ -122,28 +114,37 @@ struct SoAArray(T) {
 	ToSoA!T _data;
 	
 	void opOpAssign(string op : "~")(T t) {	
-		
 		void fnAssign(size_t idx, X)(X x){		
-				
-			//~ pragma(msg, "\n" ,FieldTypeTuple!X);
-			
 			foreach(i, F; FieldTypeTuple!X) {
 				enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
-				
 				static if(FieldTypeTuple!F.length > 1) {
 					fnAssign!(IDX)(x.tupleof[i]);
 				}
 				else {
-					//~ pragma(msg, "this._data[",IDX,"] ~= x.tupleof[",i,"];");
 					this._data[IDX] ~= x.tupleof[i];
 				}
 			}
-			//~ pragma(msg, "\n");
 		}
-		
 		fnAssign!(0)(t);
 	}
-	
+
+	void insertInPlace(T t) {	
+		void fnAssign(size_t idx, X)(X x){		
+			import std.array : insertInPlace;
+			foreach(i, F; FieldTypeTuple!X) {
+				enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
+				static if(FieldTypeTuple!F.length > 1) {
+					fnAssign!(IDX)(x.tupleof[i]);
+				}
+				else {
+					this._data[IDX].insertInPlace(x.tupleof[i]);
+				}
+			}
+		}
+		fnAssign!(0)(t);
+	}
+
+
 	void remove(size_t idx) {
 		foreach(i, Field; ToSoA!T) {
 			_data[i][idx] = _data[i].back;
