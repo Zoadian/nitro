@@ -8,6 +8,7 @@ Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel), $(WEB lvl3.org, Paul Fre
 */
 module nitro.gen.querygen;
 
+import nitro.soa;
 //---------------------------------------------------------------------------------------------------
 
 auto pushEntity(ECM, ARGS...)(ECM ecm, ARGS args) {
@@ -26,6 +27,7 @@ mixin template AutoQuery() {
 }
 
 //---------------------------------------------------------------------------------------------------
+alias QRY = Accessor;
 mixin template AutoQueryMapper(alias ECM) {
 	
     private template IterateQueryFkts(PARENT, LIST...) if(LIST.length > 0) {
@@ -37,8 +39,24 @@ mixin template AutoQueryMapper(alias ECM) {
 
 		static if(is(RETURN_TYPE == void) || is(RETURN_TYPE == bool)) {
 			alias ELEMENT_PARAMS = ParameterTypeTuple!(ELEMENT);
+
 			enum ToString(T) = T.stringof;
-			enum RESULT = generateAutoQueries!(ECM, is(RETURN_TYPE==bool), staticMap!(ToString, ELEMENT_PARAMS));
+
+			private template GetBareType(string TYPE_STRING) {
+				import std.algorithm : startsWith, endsWith;
+				enum QUERY_IDENTIFIER = "QRY!";
+				pragma(msg, "QUERY_IDENTIFIER: ", QUERY_IDENTIFIER);
+				static if(TYPE_STRING.startsWith(QUERY_IDENTIFIER)) {
+					enum BARE_TYPE = TYPE_STRING[QUERY_IDENTIFIER.length..$];
+					pragma(msg, "BARE_TYPE: ", BARE_TYPE);
+					static if(BARE_TYPE.startsWith("(") && BARE_TYPE.endsWith(")"))
+						enum GetBareType = BARE_TYPE[1..($-1)];
+					else
+						enum GetBareType = BARE_TYPE;
+				}
+			}
+
+			enum RESULT = generateAutoQueries!(ECM, is(RETURN_TYPE==bool), staticMap!(GetBareType, staticMap!(ToString, ELEMENT_PARAMS)));
 			pragma(msg, RESULT);
 		}
 

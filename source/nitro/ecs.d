@@ -343,6 +343,7 @@ private:
 	*/
 	auto getComponent(PCS)() {
 		enum IDX = staticIndexOf!(PCS, CS);
+		static assert(IDX != -1, PCS.stringof ~ "Component is not part of " ~ CS.stringof);
 		for(;(*this._pIndices)[IDX] < _ecm._entityComponentPairs[IDX].entities.length; ++((*this._pIndices)[IDX])) {
 			if(_ecm._entityComponentPairs[IDX].entities[(*this._pIndices)[IDX]] == this._e) {
 				return _ecm._entityComponentPairs[IDX].components[(*this._pIndices)[IDX]];
