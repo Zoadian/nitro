@@ -5,7 +5,7 @@ import std.conv;
 import std.typetuple;
 import std.array;
 
-import nitro.soa;
+public import nitro.soa;
 
 
 /****************************************************************
@@ -209,7 +209,7 @@ public:
 
 	/************************************************************
 	*/
-	ref PC getComponent(PC)(Entity entity)
+	auto getComponent(PC)(Entity entity)
 	in {
 		assert(this.isValid(entity));
 		assert(this.hasComponents!PC(entity));
@@ -341,7 +341,7 @@ private:
 	/************************************************************
 	if there is no such component for this entity an exception is thrown
 	*/
-	ref PCS getComponent(PCS)() {
+	auto getComponent(PCS)() {
 		enum IDX = staticIndexOf!(PCS, CS);
 		for(;(*this._pIndices)[IDX] < _ecm._entityComponentPairs[IDX].entities.length; ++((*this._pIndices)[IDX])) {
 			if(_ecm._entityComponentPairs[IDX].entities[(*this._pIndices)[IDX]] == this._e) {
@@ -529,7 +529,7 @@ version(unittest) {
     }
 
     struct ComponentThree {
-
+		int a;
     }
 }
 

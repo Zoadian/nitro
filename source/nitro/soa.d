@@ -32,12 +32,12 @@ unittest {
 	struct Test4 { Test0 a; Test1 b; Test2 c; Test3 d; Test0 aa; }
 	struct Test5 { int* a; int[] b; int[12] c; }
 	
-	static assert( is(ToSoA!Test0 == TypeTuple!()));
-	static assert( is(ToSoA!Test1 == TypeTuple!(int[]) ));
-	static assert( is(ToSoA!Test2 == TypeTuple!(int[], float[]) ));
-	static assert( is(ToSoA!Test3 == TypeTuple!(int[], int[], float[]) ));
-	static assert( is(ToSoA!Test4 == TypeTuple!(int[], int[], float[], int[], int[], float[]) ));
-	static assert( is(ToSoA!Test5 == TypeTuple!(int*[], int[][], int[12][]) ));
+	//~ static assert( is(ToSoA!Test0 == TypeTuple!(char[])));
+	//~ static assert( is(ToSoA!Test1 == TypeTuple!(int[]) ));
+	//~ static assert( is(ToSoA!Test2 == TypeTuple!(int[], float[]) ));
+	//~ static assert( is(ToSoA!Test3 == TypeTuple!(int[], int[], float[]) ));
+	//~ static assert( is(ToSoA!Test4 == TypeTuple!(int[], int[], float[], int[], int[], float[]) ));
+	//~ static assert( is(ToSoA!Test5 == TypeTuple!(int*[], int[][], int[12][]) ));
 
     writeln("################## SOA UNITTEST STOP  ##################");
 }
@@ -80,7 +80,7 @@ struct Accessor(T) {
 				ret ~= "@property Accessor!(" ~ fullyQualifiedName!F ~ ") " ~ to!string(T.tupleof[i].stringof) ~ "(){ return Accessor!(" ~ fullyQualifiedName!F ~ ")(_idx, _pData[" ~ to!string(IDX) ~ ".." ~ to!string(IDX + RepresentationTypeTuple!F.length) ~ "]); };\n";
 			}
 			else {
-				ret ~= "@property " ~ F.stringof ~ " " ~ to!string(T.tupleof[i].stringof) ~ "(){ return (*_pData[" ~ to!string(IDX) ~ "])[_idx]; }\n";
+				ret ~= "@property ref " ~ F.stringof ~ " " ~ to!string(T.tupleof[i].stringof) ~ "(){ return (*_pData[" ~ to!string(IDX) ~ "])[_idx]; }\n";
 			}
 		}
 		return ret;
@@ -110,7 +110,7 @@ import std.traits : RepresentationTypeTuple, FieldTypeTuple;
 /**
 Implements an 'Structure of Arrays' Array.
 */
-struct SoAArray(T) {
+struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 	ToSoA!T _data;
 	
 	void opOpAssign(string op : "~")(T t) {	
@@ -128,7 +128,8 @@ struct SoAArray(T) {
 		fnAssign!(0)(t);
 	}
 
-	void insertInPlace(T t) {	
+	void insertInPlace(size_t pos, T t) {	
+		import std.array : insertInPlace;
 		void fnAssign(size_t idx, X)(X x){		
 			import std.array : insertInPlace;
 			foreach(i, F; FieldTypeTuple!X) {
@@ -137,7 +138,7 @@ struct SoAArray(T) {
 					fnAssign!(IDX)(x.tupleof[i]);
 				}
 				else {
-					this._data[IDX].insertInPlace(x.tupleof[i]);
+					this._data[IDX].insertInPlace(pos, x.tupleof[i]);
 				}
 			}
 		}

@@ -27,7 +27,7 @@ mixin template AutoQuery() {
 
 //---------------------------------------------------------------------------------------------------
 mixin template AutoQueryMapper(alias ECM) {
-
+	
     private template IterateQueryFkts(PARENT, LIST...) if(LIST.length > 0) {
         import std.traits : ParameterTypeTuple, ReturnType;
 		import std.typetuple : staticMap; 
@@ -39,6 +39,7 @@ mixin template AutoQueryMapper(alias ECM) {
 			alias ELEMENT_PARAMS = ParameterTypeTuple!(ELEMENT);
 			enum ToString(T) = T.stringof;
 			enum RESULT = generateAutoQueries!(ECM, is(RETURN_TYPE==bool), staticMap!(ToString, ELEMENT_PARAMS));
+			pragma(msg, RESULT);
 		}
 
         static if(!__traits(compiles, RESULT)) { enum RESULT = ""; }
@@ -93,7 +94,7 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 		if(typeList.length != 0) { typeList ~= ","; }
 		typeList ~= TYPE;
 	}
-
+//~ version(none){
 	// Start loop over all entities
 	code ~= "foreach(e;" ~ ecmIdentifier ~ ".query!(" ~ typeList ~ ")()){";
 
@@ -120,7 +121,7 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// Close entity iteration
 	code ~= "}";
-
+//~ }
     return code;
 }
 
@@ -186,43 +187,43 @@ version(unittest) {
             mixin AutoQueryMapper!ecm;
         }
 
-        void query(ref ComponentOne c) {
+        void query(Accessor!ComponentOne c) {
             assert(c.message == "CheckSum: ");
             c.message ~= "VC;";
         }
 
-        void query(ECM m, ref ComponentOne c) {
+        void query(ECM m, Accessor!ComponentOne c) {
             assert(c.message == "CheckSum: VC;");
             c.message ~= "VMC;";
         }
 
-        void query(Entity e, ref ComponentOne c) {
+        void query(Entity e, Accessor!ComponentOne c) {
             assert(e == Entity(0));
             assert(c.message == "CheckSum: VC;VMC;");
             c.message ~= "VEC;";
         }
 
-        void query(ECM m, Entity e, ref ComponentOne c) {
+        void query(ECM m, Entity e, Accessor!ComponentOne c) {
             assert(e == Entity(0));
             assert(c.message == "CheckSum: VC;VMC;VEC;");
             c.message ~= "VMEC;";
         }
 
-        void query(ref ComponentThree c, ref ComponentFour c2) {
+        void query(Accessor!ComponentThree c, Accessor!ComponentFour c2) {
             assert(c.message == "Check: ");
             assert(c2.message == "Sum: ");
             c.message ~= "VCC;";
             c2.message ~= "VCC;";
         }
 
-        void query(ECM m, ref ComponentThree c, ref ComponentFour c2) {
+        void query(ECM m, Accessor!ComponentThree c, Accessor!ComponentFour c2) {
             assert(c.message == "Check: VCC;");
             assert(c2.message == "Sum: VCC;");
             c.message ~= "VMCC;";
             c2.message ~= "VMCC;";
         }
 
-        void query(Entity e, ref ComponentThree c, ref ComponentFour c2) {
+        void query(Entity e, Accessor!ComponentThree c, Accessor!ComponentFour c2) {
             assert(e == Entity(2));
             assert(c.message == "Check: VCC;VMCC;");
             assert(c2.message == "Sum: VCC;VMCC;");
@@ -230,7 +231,7 @@ version(unittest) {
             c2.message ~= "VECC;";
         }
 
-        void query(ECM m, Entity e, ref ComponentThree c, ref ComponentFour c2) {
+        void query(ECM m, Entity e, Accessor!ComponentThree c, Accessor!ComponentFour c2) {
             assert(e == Entity(2));
             assert(c.message == "Check: VCC;VMCC;VECC;");
             assert(c2.message == "Sum: VCC;VMCC;VECC;");
@@ -243,13 +244,13 @@ version(unittest) {
 
         mixin AutoQuery;
 
-        bool query(ref ComponentOne c) {
+        bool query(Accessor!ComponentOne c) {
             assert(c.message == "CheckSum: VC;VMC;VEC;VMEC;");
             c.message ~= "2VC;";
             return false;
         }
 
-        bool query(ref ComponentThree c, ref ComponentFour c2) {
+        bool query(Accessor!ComponentThree c, Accessor!ComponentFour c2) {
             assert(c.message == "Check: VCC;VMCC;VECC;VMECC;");
             assert(c2.message == "Sum: VCC;VMCC;VECC;VMECC;");
             c.message ~= "2VCC;";
@@ -257,12 +258,12 @@ version(unittest) {
             return false;
         }
 
-        bool query(ref ComponentTwo c) {
+        bool query(Accessor!ComponentTwo c) {
             assert(c.message == "DeleteThis");
             return true;
         }
 
-        bool query(ref ComponentFive c, ComponentSix c2) {
+        bool query(Accessor!ComponentFive c, ComponentSix c2) {
             assert(c.message == "Delete");
             assert(c2.message == "This");
             return true;
