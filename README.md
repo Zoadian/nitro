@@ -27,8 +27,23 @@ ECS is a combination of of the concepts of entities, components and systems. Sys
 
 ### Entities/Components
 
+To work with entities and components you first have to create an instance of EntityComponentManager with all component types you want to use as template parameters. For example:
+
+    auto myECM = new EntityComponentManager!(MyComponent)();
+    
+A component can be any struct consisting of fields, for example:
+
+    struct MyComponent {
+        int id;
+        string msg;
+    }
+
+To see how to automatically generate 
+The EntityComponentManager type can also be automatically generated, see nitro.gen.
+
+Nitro works with the combination of entities and components, where components contain data and can be attatched to entities which are represented by an unique id. 
+
 TODO:
-* EntityComponentManager
     * deleteLater (entities/components)
     * clearLater 
     * deleteNow
