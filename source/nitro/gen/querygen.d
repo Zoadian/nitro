@@ -130,7 +130,7 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// Supply all component parameters
 	foreach(i, TYPE; TYPES) {
-        code ~= "e.getComponent!" ~ TYPE ~ "()";
+        code ~= "e.getComponent!(" ~ TYPE ~ ")()";
 		code ~= (i < (TYPES.length-1)) ? "," : ");";
 	}
 

@@ -67,20 +67,33 @@ struct Accessor(T) {
 		}
 	}
 
+	alias FTT = FieldTypeTuple!T;
+
+	template AccessorOf(T) {
+		static if(FieldTypeTuple!(T).length > 1) {
+			alias AccessorOf = Accessor!T;
+		}
+		else {
+			alias AccessorOf = T;
+		}
+	}
+
+	alias _ACCESSORS = staticMap!(AccessorOf, FTT);
+	pragma(msg, _ACCESSORS);
+
 	static string _gen() {
 		string ret;
-		alias FTT = FieldTypeTuple!T;
 		foreach(i, F; FTT) {
 			enum IDX = (i > 0) ? TypeTuple!(staticMap!(RepresentationTypeTuple, FTT[0..i])).length : 0;
 				
 			//~ pragma(msg, fullyQualifiedName!F);
 						
 			static if(FieldTypeTuple!F.length > 1) {
-				ret ~= "import " ~ moduleName!F ~"; \n";
-				ret ~= "@property Accessor!(" ~ fullyQualifiedName!F ~ ") " ~ to!string(T.tupleof[i].stringof) ~ "(){ return Accessor!(" ~ fullyQualifiedName!F ~ ")(_idx, _pData[" ~ to!string(IDX) ~ ".." ~ to!string(IDX + RepresentationTypeTuple!F.length) ~ "]); };\n";
+				//ret ~= "import " ~ moduleName!F ~"; \n";
+				ret ~= "@property _ACCESSORS[" ~ to!string(i) ~ "] " ~ to!string(T.tupleof[i].stringof) ~ "(){ return _ACCESSORS[" ~ to!string(i) ~ "](_idx, _pData[" ~ to!string(IDX) ~ ".." ~ to!string(IDX + RepresentationTypeTuple!F.length) ~ "]); };\n";
 			}
 			else {
-				ret ~= "@property ref " ~ F.stringof ~ " " ~ to!string(T.tupleof[i].stringof) ~ "(){ return (*_pData[" ~ to!string(IDX) ~ "])[_idx]; }\n";
+				ret ~= "@property ref _ACCESSORS[" ~ to!string(i) ~ "] " ~ to!string(T.tupleof[i].stringof) ~ "(){ return (*_pData[" ~ to!string(IDX) ~ "])[_idx]; }\n";
 			}
 		}
 		return ret;
