@@ -30,44 +30,18 @@ mixin template AutoQuery() {
 	}
 }
 
+template TemplateInfo( T ) {
+	static if ( is( T t == U!V, alias U, V... ) ) {
+		alias U Template;
+		alias V Arguments;
+	}
+}
+
 //---------------------------------------------------------------------------------------------------
 mixin template AutoQueryMapper(alias ECM) {
-	import std.typetuple : staticMap; 
 
-    private template IterateQueryFkts(PARENT, LIST...) if(LIST.length > 0) {
-        import std.traits : ParameterTypeTuple, ReturnType;
-
-		alias ELEMENT = LIST[0];
-		alias RETURN_TYPE = ReturnType!(ELEMENT);
-
-		static if(is(RETURN_TYPE == void) || is(RETURN_TYPE == bool)) {
-			alias ELEMENT_PARAMS = ParameterTypeTuple!(ELEMENT);
-
-			enum ToString(T) = T.stringof;
-
-			private template GetBareType(string TYPE_STRING) {
-				import std.algorithm : startsWith, endsWith;
-				enum QUERY_IDENTIFIER = "Qry!";
-				static if(TYPE_STRING.startsWith(QUERY_IDENTIFIER)) {
-					enum BARE_TYPE = TYPE_STRING[QUERY_IDENTIFIER.length..$];
-					static if(BARE_TYPE.startsWith("(") && BARE_TYPE.endsWith(")"))
-						enum GetBareType = BARE_TYPE[1..($-1)];
-					else
-						enum GetBareType = BARE_TYPE;
-				}
-			}
-
-			enum RESULT = generateAutoQueries!(ECM, is(RETURN_TYPE==bool), staticMap!(GetBareType, staticMap!(ToString, ELEMENT_PARAMS)));
-		}
-
-        static if(!__traits(compiles, RESULT)) { enum RESULT = ""; }
-		static if(LIST.length > 1)
-			enum IterateQueryFkts = RESULT ~ " " ~ IterateQueryFkts!(PARENT, LIST[1..$]);
-		else
-			enum IterateQueryFkts = RESULT;
-    }
-
-	template QuerysOfSystem(alias SYSTEM) {
+	template SystemQueries(alias SYSTEM) {
+		import std.typetuple : staticMap; 
 		import std.traits : ParameterTypeTuple, ReturnType;
 		import std.typetuple : allSatisfy;
 
@@ -79,67 +53,57 @@ mixin template AutoQueryMapper(alias ECM) {
 			alias MemberFunctions = staticMap!(ToFunctionType, __traits(allMembers, T));
 		}
 
-		template isQuery(alias functionType) {
-
-			template isValidParam(param) {
-
-				template TemplateInfo( T ) {
-					static if ( is( T t == U!V, alias U, V... ) ) {
-						alias U Template;
-						alias V Arguments;
-					}
-				}
-
-				static if(is(param == typeof(ECM)) || is(param == Entity)) {
+		template isValidParam(param) {
+			static if(is(param == typeof(ECM)) || is(param == Entity)) {
+				enum isValidParam = true;
+			}
+			else {
+				alias paramInfo = TemplateInfo!param;
+				static if(	__traits(compiles, paramInfo.Arguments)			&& 
+							paramInfo.Arguments.length == 1					&& 
+							is(paramInfo.Arguments[0] == struct)			&& 
+							is(param == Accessor!(paramInfo.Arguments[0]))	) {
 					enum isValidParam = true;
 				}
 				else {
-					alias paramInfo = TemplateInfo!param;
-					static if(
-						__traits(compiles, paramInfo.Arguments) && 
-						paramInfo.Arguments.length == 1 && 
-						is(paramInfo.Arguments[0] == struct) && 
-						is(param == Accessor!(paramInfo.Arguments[0]))
-					) {
-						enum isValidParam = true;
-					}
-					else {
-						enum isValidParam = false;
-					}
+					enum isValidParam = false;
 				}
 			}
+		}
 
+		template isQuery(alias functionType) {
 			alias params = ParameterTypeTuple!functionType;
 			alias returnType = ReturnType!functionType;
 
 			static if(params.length > 0 && (is(returnType == void) || is(returnType == bool))) {
-				static if(allSatisfy!(isValidParam, params)) {
-					enum RESULT = true;
-				}
+				enum isQuery = (allSatisfy!(isValidParam, params)) ? true : false;
 			}
-
-			static if(!__traits(compiles, RESULT)) { enum RESULT = false; }
-			enum isQuery = RESULT;
+			else {
+				enum isQuery = false;
+			}
 		}
 
 		import std.typetuple : Filter;
-		alias QuerysOfSystem = Filter!(isQuery, MemberFunctions!SYSTEM);
+		alias SystemQueries = Filter!(isQuery, MemberFunctions!SYSTEM);
 	}	
 
-	alias Queries = QuerysOfSystem!(typeof(this));
-	pragma(msg, "Queries: ", Queries);
+	mixin template InvokeQueries(QUERIES...) {
+		static if(QUERIES.length > 0) {
+			bool AutoQueryFkt() { 
+				bool deleteEntity = false;
 
-    static if(__traits(compiles, __traits(getOverloads, typeof(this), "query"))) {
-		private import std.algorithm : sort;
-		private import std.array : array;
-		bool AutoQueryFkt() { 
-			bool deleteEntity = false;
-			mixin(IterateQueryFkts!(typeof(this), __traits(getOverloads, typeof(this), "query")));
-			ECM.deleteNow();
-			return true;
-		}
-	    bool autoQueryFktExecuted = AutoQueryFkt();
-    }
+				foreach(QUERY;QUERIES) {
+					// TOOD: Replace generateAutoQueries
+				}
+
+				ECM.deleteNow();
+				return true;
+			}
+			bool autoQueryFktExecuted = AutoQueryFkt();
+		}	
+	}
+
+	mixin InvokeQueries!(SystemQueries!(typeof(this)));
 }
 
 
