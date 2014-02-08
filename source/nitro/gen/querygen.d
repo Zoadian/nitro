@@ -11,6 +11,10 @@ module nitro.gen.querygen;
 import nitro.soa;
 //---------------------------------------------------------------------------------------------------
 
+alias Qry = Accessor;
+
+//---------------------------------------------------------------------------------------------------
+
 auto pushEntity(ECM, ARGS...)(ECM ecm, ARGS args) {
 	auto e = ecm.createEntity();
 	foreach(arg;args) {
@@ -27,12 +31,11 @@ mixin template AutoQuery() {
 }
 
 //---------------------------------------------------------------------------------------------------
-alias QRY = Accessor;
 mixin template AutoQueryMapper(alias ECM) {
-	
+	import std.typetuple : staticMap; 
+
     private template IterateQueryFkts(PARENT, LIST...) if(LIST.length > 0) {
         import std.traits : ParameterTypeTuple, ReturnType;
-		import std.typetuple : staticMap; 
 
 		alias ELEMENT = LIST[0];
 		alias RETURN_TYPE = ReturnType!(ELEMENT);
@@ -44,11 +47,9 @@ mixin template AutoQueryMapper(alias ECM) {
 
 			private template GetBareType(string TYPE_STRING) {
 				import std.algorithm : startsWith, endsWith;
-				enum QUERY_IDENTIFIER = "QRY!";
-				pragma(msg, "QUERY_IDENTIFIER: ", QUERY_IDENTIFIER);
+				enum QUERY_IDENTIFIER = "Qry!";
 				static if(TYPE_STRING.startsWith(QUERY_IDENTIFIER)) {
 					enum BARE_TYPE = TYPE_STRING[QUERY_IDENTIFIER.length..$];
-					pragma(msg, "BARE_TYPE: ", BARE_TYPE);
 					static if(BARE_TYPE.startsWith("(") && BARE_TYPE.endsWith(")"))
 						enum GetBareType = BARE_TYPE[1..($-1)];
 					else
@@ -57,7 +58,6 @@ mixin template AutoQueryMapper(alias ECM) {
 			}
 
 			enum RESULT = generateAutoQueries!(ECM, is(RETURN_TYPE==bool), staticMap!(GetBareType, staticMap!(ToString, ELEMENT_PARAMS)));
-			pragma(msg, RESULT);
 		}
 
         static if(!__traits(compiles, RESULT)) { enum RESULT = ""; }
@@ -67,6 +67,68 @@ mixin template AutoQueryMapper(alias ECM) {
 			enum IterateQueryFkts = RESULT;
     }
 
+	template QuerysOfSystem(alias SYSTEM) {
+		import std.traits : ParameterTypeTuple, ReturnType;
+		import std.typetuple : allSatisfy;
+
+		template MemberFunctions(T) {
+			template ToFunctionType(string functionName) {
+				import std.traits : MemberFunctionsTuple;
+				alias ToFunctionType = MemberFunctionsTuple!(T, functionName);
+			}
+			alias MemberFunctions = staticMap!(ToFunctionType, __traits(allMembers, T));
+		}
+
+		template isQuery(alias functionType) {
+
+			template isValidParam(param) {
+
+				template TemplateInfo( T ) {
+					static if ( is( T t == U!V, alias U, V... ) ) {
+						alias U Template;
+						alias V Arguments;
+					}
+				}
+
+				static if(is(param == typeof(ECM)) || is(param == Entity)) {
+					enum isValidParam = true;
+				}
+				else {
+					alias paramInfo = TemplateInfo!param;
+					static if(
+						__traits(compiles, paramInfo.Arguments) && 
+						paramInfo.Arguments.length == 1 && 
+						is(paramInfo.Arguments[0] == struct) && 
+						is(param == Accessor!(paramInfo.Arguments[0]))
+					) {
+						enum isValidParam = true;
+					}
+					else {
+						enum isValidParam = false;
+					}
+				}
+			}
+
+			alias params = ParameterTypeTuple!functionType;
+			alias returnType = ReturnType!functionType;
+
+			static if(params.length > 0 && (is(returnType == void) || is(returnType == bool))) {
+				static if(allSatisfy!(isValidParam, params)) {
+					enum RESULT = true;
+				}
+			}
+
+			static if(!__traits(compiles, RESULT)) { enum RESULT = false; }
+			enum isQuery = RESULT;
+		}
+
+		import std.typetuple : Filter;
+		alias QuerysOfSystem = Filter!(isQuery, MemberFunctions!SYSTEM);
+	}	
+
+	alias Queries = QuerysOfSystem!(typeof(this));
+	pragma(msg, "Queries: ", Queries);
+
     static if(__traits(compiles, __traits(getOverloads, typeof(this), "query"))) {
 		private import std.algorithm : sort;
 		private import std.array : array;
@@ -74,7 +136,7 @@ mixin template AutoQueryMapper(alias ECM) {
 			bool deleteEntity = false;
 			mixin(IterateQueryFkts!(typeof(this), __traits(getOverloads, typeof(this), "query")));
 			ECM.deleteNow();
-			return true; 
+			return true;
 		}
 	    bool autoQueryFktExecuted = AutoQueryFkt();
     }
@@ -112,7 +174,7 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 		if(typeList.length != 0) { typeList ~= ","; }
 		typeList ~= TYPE;
 	}
-//~ version(none){
+
 	// Start loop over all entities
 	code ~= "foreach(e;" ~ ecmIdentifier ~ ".query!(" ~ typeList ~ ")()){";
 
@@ -139,56 +201,12 @@ string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
 
 	// Close entity iteration
 	code ~= "}";
-//~ }
+
     return code;
 }
 
 //###################################################################################################
-
-version(none) {
-	mixin template FANCY() {
-		import std.typetuple;
-		import std.typecons;
-		import std.traits;
-		import std.algorithm;
-		alias FNS = typeof(__traits(getOverloads, typeof(this), "query"));	
-
-		void fancyfy(ECM)(ECM ecm) {
-			foreach(i, FN; FNS) {
-				alias COMPONENT_LIST = ParameterTypeTuple!FN;
-
-				foreach(e; ecm.query!(COMPONENT_LIST)) {
-
-					auto getComponent(COMPONENT)() {
-						return ecm.getComponent!COMPONENT(e);
-					}
-
-					enum isNotTypeofEcs(T) = is(T == ECM);
-
-					alias CALL_LIST = Filter!(isNotTypeofEcs, staticMap!(getComponent, COMPONENT_LIST));
-					pragma(msg, typeof(CALL_LIST));
-
-					// Todo: supply ecm as first parameter if defined
-
-					static if(is(ReturnType!FN == bool)) {
-						bool doDelete = __traits(getOverloads, typeof(this), "query")[i](*CALL_LIST[0]());
-						// Todo: delete entity if true
-					}
-					else static if(is(ReturnType!FN == void)) {
-						// Todo: call all in list
-						__traits(getOverloads, typeof(this), "query")[i](*CALL_LIST[0]());
-					}
-					else {
-						static assert(0, "Something is bad");
-					}
-				}
-			}	
-		}
-	}
-}
-
-//###################################################################################################
-
+/*
 version(unittest) {
     import nitro;
     @Component struct ComponentOne { string message; }
@@ -336,3 +354,4 @@ unittest {
 
     writeln("################## GEN.QUERYGEN UNITTEST STOP  ##################");
 }
+*/

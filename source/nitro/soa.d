@@ -79,7 +79,6 @@ struct Accessor(T) {
 	}
 
 	alias _ACCESSORS = staticMap!(AccessorOf, FTT);
-	pragma(msg, _ACCESSORS);
 
 	static string _gen() {
 		string ret;
@@ -99,7 +98,6 @@ struct Accessor(T) {
 		return ret;
 	}
 	
-	pragma(msg, _gen());
 	mixin(_gen());
 	/*
 	void test(){
