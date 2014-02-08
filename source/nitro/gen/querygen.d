@@ -6,12 +6,41 @@ License:   $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
 
 Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel), $(WEB lvl3.org, Paul Freund)
 */
+
+/*
+
+	Todo:
+	* Cleanup code
+	* Make overloaded query functions work
+	* Test mixed arguments
+	* Update unittests to work and include mixed arguments/overloads/free function names
+
+*/
+
 module nitro.gen.querygen;
 
 import nitro.soa;
 //---------------------------------------------------------------------------------------------------
 
 alias Qry = Accessor;
+
+//---------------------------------------------------------------------------------------------------
+
+template TemplateInfo( T ) {
+	static if ( is( T t == U!V, alias U, V... ) ) {
+		alias U Template;
+		alias V Arguments;
+	}
+}
+
+template MemberFunctions(T) {
+	import std.typetuple : staticMap; 
+	template ToFunctionType(string functionName) {
+		import std.traits : MemberFunctionsTuple;
+		alias ToFunctionType = MemberFunctionsTuple!(T, functionName);
+	}
+	alias MemberFunctions = staticMap!(ToFunctionType, __traits(allMembers, T));
+}
 
 //---------------------------------------------------------------------------------------------------
 
@@ -30,70 +59,91 @@ mixin template AutoQuery() {
 	}
 }
 
-template TemplateInfo( T ) {
-	static if ( is( T t == U!V, alias U, V... ) ) {
-		alias U Template;
-		alias V Arguments;
-	}
-}
-
 //---------------------------------------------------------------------------------------------------
 mixin template AutoQueryMapper(alias ECM) {
 
+	//import std.typetuple : TypeTuple, EraseAll, staticMap, allSatisfy, anySatisfy; 
+	//import std.traits : ParameterTypeTuple, ReturnType;
+	import std.typetuple;
+	import std.typecons;
+	import std.traits;
+
+	template QueryType(param) {
+		static if(is(param == typeof(ECM)) || is(param == Entity)) {
+			alias QueryType = void;
+		}
+		else {
+			alias paramInfo = TemplateInfo!param;
+			static if(	__traits(compiles, paramInfo.Arguments)			&& 
+						paramInfo.Arguments.length == 1					&& 
+						is(paramInfo.Arguments[0] == struct)			&& 
+						is(param == Accessor!(paramInfo.Arguments[0]))	) {
+				alias QueryType = paramInfo.Arguments[0];
+			}
+			else {
+				alias QueryType = bool;
+			}
+		}
+	}
+
+	template QueryTypes(alias T) {
+		alias params = ParameterTypeTuple!T;
+		alias paramQueryTypes = EraseAll!(void, staticMap!(QueryType, params));
+		enum isBool(T) = is(T == bool);
+		static if(paramQueryTypes.length > 0 && !anySatisfy!(isBool, paramQueryTypes))
+			alias QueryTypes = paramQueryTypes;
+		else
+			alias QueryTypes = void;
+	}
+
 	template SystemQueries(alias SYSTEM) {
-		import std.typetuple : staticMap; 
-		import std.traits : ParameterTypeTuple, ReturnType;
-		import std.typetuple : allSatisfy;
 
-		template MemberFunctions(T) {
-			template ToFunctionType(string functionName) {
-				import std.traits : MemberFunctionsTuple;
-				alias ToFunctionType = MemberFunctionsTuple!(T, functionName);
-			}
-			alias MemberFunctions = staticMap!(ToFunctionType, __traits(allMembers, T));
-		}
-
-		template isValidParam(param) {
-			static if(is(param == typeof(ECM)) || is(param == Entity)) {
-				enum isValidParam = true;
-			}
-			else {
-				alias paramInfo = TemplateInfo!param;
-				static if(	__traits(compiles, paramInfo.Arguments)			&& 
-							paramInfo.Arguments.length == 1					&& 
-							is(paramInfo.Arguments[0] == struct)			&& 
-							is(param == Accessor!(paramInfo.Arguments[0]))	) {
-					enum isValidParam = true;
-				}
-				else {
-					enum isValidParam = false;
-				}
-			}
-		}
-
-		template isQuery(alias functionType) {
-			alias params = ParameterTypeTuple!functionType;
+		template getQuery(alias functionType) {
 			alias returnType = ReturnType!functionType;
+			alias queryTypes = QueryTypes!functionType;
 
-			static if(params.length > 0 && (is(returnType == void) || is(returnType == bool))) {
-				enum isQuery = (allSatisfy!(isValidParam, params)) ? true : false;
-			}
-			else {
-				enum isQuery = false;
-			}
+			static if(!is(returnType == void) && !is(returnType == bool))
+				alias getQuery = void;
+			else static if(is(queryTypes == void))
+				alias getQuery = void;
+			else
+				alias getQuery = functionType;
 		}
 
-		import std.typetuple : Filter;
-		alias SystemQueries = Filter!(isQuery, MemberFunctions!SYSTEM);
+		alias SystemQueries = EraseAll!(void, staticMap!(getQuery, MemberFunctions!SYSTEM));		  
+
 	}	
 
 	mixin template InvokeQueries(QUERIES...) {
 		static if(QUERIES.length > 0) {
 			bool AutoQueryFkt() { 
-				bool deleteEntity = false;
-
 				foreach(QUERY;QUERIES) {
-					// TOOD: Replace generateAutoQueries
+					foreach(e; ECM.query!(QueryTypes!QUERY)()) {
+
+						template CallParameter(param) {
+							static if(is(param == typeof(ECM))) {
+								alias CallParameter = ECM;
+							}
+							else static if(is(param == Entity)) {
+								alias CallParameter = e;
+							}
+							else {
+								alias paramInfo = TemplateInfo!param;
+								alias componentType = paramInfo.Arguments[0];
+								auto getComponent(T)() { return e.getComponent!(T)(); }
+								alias CallParameter = getComponent!componentType;
+							}
+						}
+						alias callParameters = staticMap!(CallParameter, ParameterTypeTuple!QUERY);
+						static if(is(ReturnType!QUERY == bool)) {
+							if(QUERY(callParameters)) 
+								ECM.deleteLater(e);
+						}
+						else {
+							QUERY(callParameters);
+						}
+					}
+
 				}
 
 				ECM.deleteNow();
@@ -104,69 +154,6 @@ mixin template AutoQueryMapper(alias ECM) {
 	}
 
 	mixin InvokeQueries!(SystemQueries!(typeof(this)));
-}
-
-
-//---------------------------------------------------------------------------------------------------
-string generateAutoQueries(alias ECM, bool isBool, PARAMS...)() {
-    string code = "";
-	string ecmIdentifier = __traits(identifier, ECM); 
-
-	// Remove optional ecs parameter from list
-	static if(PARAMS[0] == typeof(ECM).stringof) {
-        enum ecmDefined = true;
-		alias TYPES_WITHOUT_ECM = PARAMS[1..$];
-    }
-    else {
-        enum ecmDefined = false;
-		alias TYPES_WITHOUT_ECM = PARAMS;
-    }
-
-    // Remove optional entity parameter from list
-    static if(TYPES_WITHOUT_ECM[0] == "Entity") {
-        enum entityDefined = true;
-		alias TYPES = TYPES_WITHOUT_ECM[1..$];
-    }
-    else {
-        enum entityDefined = false;
-		alias TYPES = TYPES_WITHOUT_ECM;
-    }
-
-	// Generate list of types
-	string typeList = "";
-	foreach(TYPE; TYPES) {
-		if(typeList.length != 0) { typeList ~= ","; }
-		typeList ~= TYPE;
-	}
-
-	// Start loop over all entities
-	code ~= "foreach(e;" ~ ecmIdentifier ~ ".query!(" ~ typeList ~ ")()){";
-
-	// Get return value if bool return
-	if(isBool) { code ~= "deleteEntity="; }
-
-	// invoke query function
-	code ~= "query(";
-
-	// Supply optional ecm parameter if defined
-	static if(ecmDefined) { code ~= ecmIdentifier ~ ","; }
-
-	// Supply optional entity parameter if defined
-	static if(entityDefined) { code ~= "e,"; }
-
-	// Supply all component parameters
-	foreach(i, TYPE; TYPES) {
-        code ~= "e.getComponent!(" ~ TYPE ~ ")()";
-		code ~= (i < (TYPES.length-1)) ? "," : ");";
-	}
-
-	// If function returns bool, remove component if true
-	if(isBool) { code ~= "if(deleteEntity){" ~ ecmIdentifier ~ ".deleteLater(e); }"; }
-
-	// Close entity iteration
-	code ~= "}";
-
-    return code;
 }
 
 //###################################################################################################
@@ -187,43 +174,43 @@ version(unittest) {
             mixin AutoQueryMapper!ecm;
         }
 
-        void query(Accessor!ComponentOne c) {
+        void query(Qry!ComponentOne c) {
             assert(c.message == "CheckSum: ");
             c.message ~= "VC;";
         }
 
-        void query(ECM m, Accessor!ComponentOne c) {
+        void query(ECM m, Qry!ComponentOne c) {
             assert(c.message == "CheckSum: VC;");
             c.message ~= "VMC;";
         }
 
-        void query(Entity e, Accessor!ComponentOne c) {
+        void query(Entity e, Qry!ComponentOne c) {
             assert(e == Entity(0));
             assert(c.message == "CheckSum: VC;VMC;");
             c.message ~= "VEC;";
         }
 
-        void query(ECM m, Entity e, Accessor!ComponentOne c) {
+        void query(ECM m, Entity e, Qry!ComponentOne c) {
             assert(e == Entity(0));
             assert(c.message == "CheckSum: VC;VMC;VEC;");
             c.message ~= "VMEC;";
         }
 
-        void query(Accessor!ComponentThree c, Accessor!ComponentFour c2) {
+        void query(Qry!ComponentThree c, Qry!ComponentFour c2) {
             assert(c.message == "Check: ");
             assert(c2.message == "Sum: ");
             c.message ~= "VCC;";
             c2.message ~= "VCC;";
         }
 
-        void query(ECM m, Accessor!ComponentThree c, Accessor!ComponentFour c2) {
+        void query(ECM m, Qry!ComponentThree c, Qry!ComponentFour c2) {
             assert(c.message == "Check: VCC;");
             assert(c2.message == "Sum: VCC;");
             c.message ~= "VMCC;";
             c2.message ~= "VMCC;";
         }
 
-        void query(Entity e, Accessor!ComponentThree c, Accessor!ComponentFour c2) {
+        void query(Entity e, Qry!ComponentThree c, Qry!ComponentFour c2) {
             assert(e == Entity(2));
             assert(c.message == "Check: VCC;VMCC;");
             assert(c2.message == "Sum: VCC;VMCC;");
@@ -231,7 +218,7 @@ version(unittest) {
             c2.message ~= "VECC;";
         }
 
-        void query(ECM m, Entity e, Accessor!ComponentThree c, Accessor!ComponentFour c2) {
+        void query(ECM m, Entity e, Qry!ComponentThree c, Qry!ComponentFour c2) {
             assert(e == Entity(2));
             assert(c.message == "Check: VCC;VMCC;VECC;");
             assert(c2.message == "Sum: VCC;VMCC;VECC;");
@@ -244,13 +231,13 @@ version(unittest) {
 
         mixin AutoQuery;
 
-        bool query(Accessor!ComponentOne c) {
+        bool query(Qry!ComponentOne c) {
             assert(c.message == "CheckSum: VC;VMC;VEC;VMEC;");
             c.message ~= "2VC;";
             return false;
         }
 
-        bool query(Accessor!ComponentThree c, Accessor!ComponentFour c2) {
+        bool query(Qry!ComponentThree c, Qry!ComponentFour c2) {
             assert(c.message == "Check: VCC;VMCC;VECC;VMECC;");
             assert(c2.message == "Sum: VCC;VMCC;VECC;VMECC;");
             c.message ~= "2VCC;";
@@ -258,12 +245,12 @@ version(unittest) {
             return false;
         }
 
-        bool query(Accessor!ComponentTwo c) {
+        bool query(Qry!ComponentTwo c) {
             assert(c.message == "DeleteThis");
             return true;
         }
 
-        bool query(Accessor!ComponentFive c, ComponentSix c2) {
+        bool query(Qry!ComponentFive c, ComponentSix c2) {
             assert(c.message == "Delete");
             assert(c2.message == "This");
             return true;
