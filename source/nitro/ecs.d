@@ -11,7 +11,10 @@ public import nitro.soa;
 /****************************************************************
 */
 struct Entity { 
+private:
 	size_t id; 
+
+private:
 	int opCmp(ref const Entity entity) const {
         if(this.id < entity.id)
             return -1;
@@ -30,43 +33,43 @@ private:
 	ubyte[CS.length / 8 + 1] _bits;
 	
 public:	   	   
-	void set(CSS...)() { 
+	void set(CSS...)() @safe nothrow { 
 		foreach(C; CSS) {
 			this._set!C();			
 		}
 	}				 
 	
-	void unset(CSS...)() {
+	void unset(CSS...)() @safe nothrow {
 		foreach(C; CSS) {
 			this._unset!C();			
 		}
 	}
 	
-	bool isset(CSS...)() const {
+	bool isset(CSS...)() const @safe nothrow {
 		foreach(C; CSS) {
 			if(!this._isset!C()) return false;			
 		}
 		return true;
 	}
 	
-	void clear() {
+	void clear() @safe nothrow {
 		this._bits = this._bits.init;
 	}
 	
 private:	
-	void _set(C)() { 
+	void _set(C)() @safe nothrow { 
 		alias IDX = staticIndexOf!(C, CS);
 		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
 		this._bits[IDX / 8] |=  1 << (IDX % 8);
 	}
 	
-	void _unset(C)() {	   
+	void _unset(C)() @safe nothrow {	   
 		alias IDX = staticIndexOf!(C, CS);
 		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);	 
 		this._bits[IDX / 8] &= ~(1 << (IDX % 8));
 	}
 	
-	bool _isset(C)() const {		
+	bool _isset(C)() const @safe nothrow {		
 		alias IDX = staticIndexOf!(C, CS);
 		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
 		return (this._bits[IDX / 8] & (1 << (IDX % 8))) > 0;
@@ -92,16 +95,16 @@ private template EntityComponentPairs(CS...) {
 /****************************************************************
 */
 class EntityComponentManager(CS...) if(CS.length == 0) {
-	void deleteLater(Entity entity) {}
-	void deleteLater(PCS...)(Entity entity) {}
+	void deleteLater(Entity entity) @safe nothrow {}
+	void deleteLater(PCS...)(Entity entity) @safe nothrow {}
 	alias clearLater = deleteLater!CS;
-	void deleteNow() {}
-	Entity createEntity() { assert(0); }
-	bool isValid(Entity entity) const { assert(0); }
-	bool hasComponents(PCS...)(Entity entity) const { assert(0); }
-	void addComponents(PCS...)(Entity entity, PCS pcs) {}
-	ref PC getComponent(PC)(Entity entity) { assert(0); }
-	QueryResult!(Entity[], CS) query(PCS...)() { assert(0); }
+	void deleteNow() @safe nothrow {}
+	Entity createEntity() @safe nothrow { assert(0); }
+	bool isValid(Entity entity) const @safe nothrow { assert(0); }
+	bool hasComponents(PCS...)(Entity entity) const @safe nothrow { assert(0); }
+	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow {}
+	ref PC getComponent(PC)(Entity entity) @safe nothrow { assert(0); }
+	QueryResult!(Entity[], CS) query(PCS...)() @safe nothrow { assert(0); }
 }
 
 /****************************************************************
@@ -118,13 +121,13 @@ private:
 public:
 	/************************************************************
 	*/
-	void deleteLater(Entity entity) {
+	void deleteLater(Entity entity) @safe nothrow {
 		this._deleteLaterEntities ~= entity;
 	}
 
 	/************************************************************
 	*/
-	void deleteLater(PCS...)(Entity entity) {
+	void deleteLater(PCS...)(Entity entity) @safe nothrow {
 		auto p = entity in this._deleteLaterComponents;
 		if(p is null) {
 			this._deleteLaterComponents[entity] = ComponentBits!CS();
@@ -155,7 +158,7 @@ public:
 
 	/************************************************************
 	*/
-	Entity createEntity() {
+	Entity createEntity() @safe nothrow {
 		auto e = Entity(_nextId++);
 		_mapEntityComponentBits[e] = ComponentBits!CS();
 		return e;
@@ -163,13 +166,13 @@ public:
 	
 	/************************************************************
 	*/
-	bool isValid(Entity entity) const {
+	bool isValid(Entity entity) const @safe nothrow {
 		return (entity in this._mapEntityComponentBits) !is null;
 	}
 
 	/************************************************************
 	*/
-	bool hasComponents(PCS...)(Entity entity) const
+	bool hasComponents(PCS...)(Entity entity) const @safe nothrow
 	in {
 		assert(this.isValid(entity));
 	}
@@ -283,26 +286,26 @@ struct QueryResult(R, CS...) {
 
 	/************************************************************
 	*/
-	this(R range, EntityComponentManager!CS ecm){
+	this(R range, EntityComponentManager!CS ecm) @safe nothrow {
 		this._range = range;
 		this._ecm = ecm;
 	}
 	
 	/************************************************************
 	*/
-	EntityResult!CS front() @property {
+	EntityResult!CS front() @property @safe nothrow {
 		return EntityResult!CS(_range.front, &indices, _ecm);
 	}
 	
 	/************************************************************
 	*/
-	void popFront() {
+	void popFront() @safe nothrow {
 		this._range.popFront();
 	}
 	
 	/************************************************************
 	*/
-	bool empty() const @property {
+	bool empty() const @property @safe nothrow {
 		return this._range.empty;
 	}
 }
@@ -313,10 +316,9 @@ struct QueryResult(R, CS...) {
 struct EntityResult(CS...) if(CS.length == 0) {
     Entity _e = Entity(0);
     alias _e this;
-    this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm){}
-    ref PCS getComponent(PCS)() { assert(0); }
-    bool hasComponent(PCS...)() { assert(0); }
-
+	this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm) @safe nothrow {}
+	ref PCS getComponent(PCS)() @safe nothrow { assert(0); }
+	bool hasComponent(PCS...)() @safe nothrow { assert(0); }
 }
 
 /****************************************************************
@@ -332,7 +334,7 @@ private:
 
 	/************************************************************
 	*/
-	this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm) {
+	this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm) @safe nothrow {
 		this._e = e;
 		this._pIndices = pIndices;
 		this._ecm = ecm;
@@ -354,7 +356,7 @@ private:
 
 	/************************************************************
 	*/
-	bool hasComponent(PCS...)() {
+	bool hasComponent(PCS...)() @safe nothrow {
 		return _ecm.hasComponents!PCS(_e);
 	}
 }
@@ -422,7 +424,7 @@ public:
 	/************************************************************
 	Returns requested system.
 	*/	
-	auto system(alias S)() {		
+	auto system(alias S)() @safe nothrow {		
 		enum StringOf(T) = T.stringof;
 		alias IDX = staticIndexOf!(StringOf!(S!ECM), staticMap!(StringOf, SYSTEMS));
 		static assert(IDX != -1, S!ECM.stringof ~ " is not part of " ~ SYSTEMS.stringof);

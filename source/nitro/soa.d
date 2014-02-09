@@ -55,7 +55,7 @@ struct Accessor(T) {
 	SOA_PTRS _pData;
 	size_t _idx;
 		
-	this(K...)(size_t idx, ref K k) {
+	this(K...)(size_t idx, ref K k) nothrow {
 		_idx = idx;
 		foreach(i, P; K) {
 			static if(isPointer!(P)) {
@@ -80,19 +80,20 @@ struct Accessor(T) {
 
 	alias _ACCESSORS = staticMap!(AccessorOf, FTT);
 
-	static string _gen() {
+	static string _gen() @safe {
 		string ret;
 		foreach(i, F; FTT) {
 			enum IDX = (i > 0) ? TypeTuple!(staticMap!(RepresentationTypeTuple, FTT[0..i])).length : 0;
-				
-			//~ pragma(msg, fullyQualifiedName!F);
-						
+			enum idx_str = to!string(IDX);
+
+			enum fn_ret_str = " _ACCESSORS[" ~ to!string(i) ~ "] ";
+			enum fn_name_str = T.tupleof[i].stringof;
+
 			static if(FieldTypeTuple!F.length > 1) {
-				//ret ~= "import " ~ moduleName!F ~"; \n";
-				ret ~= "@property _ACCESSORS[" ~ to!string(i) ~ "] " ~ to!string(T.tupleof[i].stringof) ~ "(){ return _ACCESSORS[" ~ to!string(i) ~ "](_idx, _pData[" ~ to!string(IDX) ~ ".." ~ to!string(IDX + RepresentationTypeTuple!F.length) ~ "]); };\n";
+				ret ~= "@property" ~ fn_ret_str ~ fn_name_str ~ "(){ return " ~ fn_ret_str ~ "(_idx, _pData[" ~ to!string(IDX) ~ ".." ~ to!string(IDX + RepresentationTypeTuple!F.length) ~ "]); };\n";
 			}
 			else {
-				ret ~= "@property ref _ACCESSORS[" ~ to!string(i) ~ "] " ~ to!string(T.tupleof[i].stringof) ~ "(){ return (*_pData[" ~ to!string(IDX) ~ "])[_idx]; }\n";
+				ret ~= "@property ref" ~ fn_ret_str ~ fn_name_str ~ "(){ return (*_pData[" ~ to!string(IDX) ~ "])[_idx]; }\n";
 			}
 		}
 		return ret;
@@ -124,8 +125,9 @@ Implements an 'Structure of Arrays' Array.
 struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 	ToSoA!T _data;
 	
-	void opOpAssign(string op : "~")(T t) {	
-		void fnAssign(size_t idx, X)(X x){		
+	void opOpAssign(string op : "~")(T t) @safe nothrow {
+
+		void fnAssign(size_t idx, X)(X x) @safe nothrow {		
 			foreach(i, F; FieldTypeTuple!X) {
 				enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
 				static if(FieldTypeTuple!F.length > 1) {
@@ -136,12 +138,13 @@ struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 				}
 			}
 		}
+
 		fnAssign!(0)(t);
 	}
 
-	void insertInPlace(size_t pos, T t) {	
-		import std.array : insertInPlace;
-		void fnAssign(size_t idx, X)(X x){		
+	void insertInPlace(size_t pos, T t) nothrow {
+
+		void fnAssign(size_t idx, X)(X x) nothrow {		
 			import std.array : insertInPlace;
 			foreach(i, F; FieldTypeTuple!X) {
 				enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
@@ -149,15 +152,17 @@ struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 					fnAssign!(IDX)(x.tupleof[i]);
 				}
 				else {
+					import std.array : insertInPlace;
 					this._data[IDX].insertInPlace(pos, x.tupleof[i]);
 				}
 			}
 		}
+
 		fnAssign!(0)(t);
 	}
 
 
-	void remove(size_t idx) {
+	void remove(size_t idx) @safe nothrow {
 		foreach(i, Field; ToSoA!T) {
 			_data[i][idx] = _data[i].back;
 			_data[i].length -= 1;
@@ -169,7 +174,7 @@ struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 	}
 	
 	
-	Accessor!(T) opIndex(size_t idx) {
+	Accessor!(T) opIndex(size_t idx) nothrow {
 		return Accessor!(T)(idx, _data);
 	}
 }
