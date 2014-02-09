@@ -177,6 +177,11 @@ public:
 		assert(this.isValid(entity));
 	}
 	body {
+		foreach(PC; PCS) {
+			alias IDX = staticIndexOf!(PC, CS);
+			import std.algorithm : canFind;
+			assert(this._entityComponentPairs[IDX].entities.canFind(entity) == this._mapEntityComponentBits[entity].isset!PC(), "mismatch: component bits and component arrays!");
+		}
 		return this._mapEntityComponentBits[entity].isset!PCS();
 	}
 
