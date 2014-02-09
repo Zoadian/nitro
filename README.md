@@ -27,8 +27,23 @@ ECS is a combination of of the concepts of entities, components and systems. Sys
 
 ### Entities/Components
 
+To work with entities and components you first have to create an instance of EntityComponentManager with all component types you want to use as template parameters. For example:
+
+    auto myECM = new EntityComponentManager!(MyComponent)();
+    
+A component can be any struct consisting of fields, for example:
+
+    struct MyComponent {
+        int id;
+        string msg;
+    }
+
+To see how to automatically generate 
+The EntityComponentManager type can also be automatically generated, see nitro.gen.
+
+Nitro works with the combination of entities and components, where components contain data and can be attatched to entities which are represented by an unique id. 
+
 TODO:
-* EntityComponentManager
     * deleteLater (entities/components)
     * clearLater 
     * deleteNow
@@ -61,6 +76,31 @@ TODO:
     * AutoQueryMapper
     * pushEntity
     * ...query functions
+
+## Implementation Notes
+
+Nitro stores everything as a Structure of Arrays (SoA). 
+
+### Internal Component Representation
+
+For each Component Nitro generates a flat structure of arrays.<br />
+Let's assume we have:
+
+    struct Point {int x,y,z; }
+    @Component struct TestComp { int a; Point b; }
+
+Nitro will store it internally as:
+
+    int[] //a
+    int[] //b.x
+    int[] //b.y
+    int[] //b.z
+
+### Accessing Components
+
+getComponent!TestComp() returns an Accessor!TestComp that mimics all fields of the original TestComp.<br />
+Why?<br />
+Let's say we only access TestComp.a but have lots of TestComp components we want to iterate. Normally we'd pull all fields of TestComp into our CPU cache. By using Accessor!TestComp only TestComp.a is pulled in.
 
 ## License
 
