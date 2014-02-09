@@ -161,11 +161,11 @@ struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 		fnAssign!(0)(t);
 	}
 
-
-	void remove(size_t idx) @safe nothrow {
+	public import std.algorithm : SwapStrategy;
+	void remove(SwapStrategy swapStrategy = SwapStrategy.stable)(size_t idx) @safe {
 		foreach(i, Field; ToSoA!T) {
-			_data[i][idx] = _data[i].back;
-			_data[i].length -= 1;
+			import std.algorithm : remove;
+			_data[i] = remove!swapStrategy(_data[i], idx);
 		}
 	}
 	
