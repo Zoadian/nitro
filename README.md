@@ -77,6 +77,31 @@ TODO:
     * pushEntity
     * ...query functions
 
+## Implementation Notes
+
+Nitro stores everything as a Structure of Arrays (SoA). 
+
+### Internal Component Representation
+
+For each Component Nitro generates a flat structure of arrays.<br />
+Let's assume we have:
+
+    struct Point {int x,y,z; }
+    @Component struct TestComp { int a; Point b; }
+
+Nitro will store it internally as:
+
+    int[] //a
+    int[] //b.x
+    int[] //b.y
+    int[] //b.z
+
+### Accessing Components
+
+getComponent!TestComp() returns an Accessor!TestComp that mimics all fields of the original TestComp.<br />
+Why?<br />
+Let's say we only access TestComp.a but have lots of TestComp components we want to iterate. Normally we'd pull all fields of TestComp into our CPU cache. By using Accessor!TestComp only TestComp.a is pulled in.
+
 ## License
 
 All parts of nitro are released under the [Boost software license - version 1.0](https://github.com/Zoadian/nitro/blob/master/LICENSE.txt)
