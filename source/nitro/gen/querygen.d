@@ -120,27 +120,65 @@ mixin template AutoQueryMapper(alias ECM) {
 				foreach(QUERY;QUERIES) {
 					foreach(e; ECM.query!(QueryTypes!QUERY)()) {
 
-						template CallParameter(param) {
-							static if(is(param == typeof(ECM))) {
-								alias CallParameter = ECM;
+						// Currently produces memory mismatch for entity at runtime, should be fixed sometime
+						version(TemplateVersion) {
+							template CallParameter(param) {
+								static if(is(param == typeof(ECM))) {
+									alias CallParameter = ECM;
+								}
+								else static if(is(param == Entity)) {
+									alias CallParameter = e;
+								}
+								else {
+									alias paramInfo = TemplateInfo!param;
+									alias componentType = paramInfo.Arguments[0];
+									auto getComponent(T)() { return e.getComponent!(T)(); }
+									alias CallParameter = getComponent!componentType;
+								}
 							}
-							else static if(is(param == Entity)) {
-								alias CallParameter = e;
+
+							alias callParameters = staticMap!(CallParameter, ParameterTypeTuple!QUERY);
+
+							static if(is(ReturnType!QUERY == bool)) {
+								if(QUERY(callParameters)) 
+									ECM.deleteLater(e);
 							}
 							else {
-								alias paramInfo = TemplateInfo!param;
-								alias componentType = paramInfo.Arguments[0];
-								auto getComponent(T)() { return e.getComponent!(T)(); }
-								alias CallParameter = getComponent!componentType;
+								QUERY(callParameters);
 							}
 						}
-						alias callParameters = staticMap!(CallParameter, ParameterTypeTuple!QUERY);
-						static if(is(ReturnType!QUERY == bool)) {
-							if(QUERY(callParameters)) 
-								ECM.deleteLater(e);
-						}
 						else {
-							QUERY(callParameters);
+							string GenerateCall(PARAMETERS...)() {
+								string code = "";
+								string entitySymbol = __traits(identifier, e);
+								foreach(i, PARAMETER; PARAMETERS) {
+									static if(i != 0) { code ~= ", "; }
+
+									static if(is(PARAMETER == typeof(ECM))) {
+										code ~= __traits(identifier, ECM);
+									}
+									else static if(is(PARAMETER == Entity)) {
+										code ~= entitySymbol;
+									}
+									else {
+										alias paramInfo = TemplateInfo!PARAMETER;
+										alias componentType = paramInfo.Arguments[0];
+										code ~= entitySymbol ~ ".getComponent!(" ~ componentType.stringof ~ ")()";
+									}
+								}
+								return code;
+							}
+
+							enum queryCall = __traits(identifier, QUERY) ~ "(" ~ GenerateCall!(ParameterTypeTuple!QUERY)() ~ ");";
+
+							static if(is(ReturnType!QUERY == bool)) {
+								mixin("bool deleteEntity = " ~ queryCall);
+								if(deleteEntity)
+									ECM.deleteLater(e);
+							}
+							else {
+								mixin(queryCall);
+							}
 						}
 					}
 
