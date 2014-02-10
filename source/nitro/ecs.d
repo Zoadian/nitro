@@ -89,13 +89,30 @@ struct ComponentArray(COMPONENT) {
 	}
 }
 
+
+class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length == 0) {
+	alias Components = COMPONENTS;
+	Entity createEntity() @safe nothrow { assert(0); }
+	void deleteLater(Entity entity) @safe nothrow { assert(0); }
+	void deleteLater(PCS...)(Entity entity) @safe nothrow {assert(0); }
+	alias clearLater = deleteLater!COMPONENTS;
+	void executeDelete() { assert(0); }
+	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) { assert(0); }
+	void removeComponents(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) { assert(0); }
+	bool hasComponents(PCS...)(Entity entity) const @safe nothrow if(PCS.length > 0) { assert(0); }
+	PC getComponent(PC)(Entity entity) @safe { assert(0); }
+	QueryResult!(typeof(this), COMPONENTS) query(PCS...)() @safe nothrow { assert(0); }
+	void _destroyEntity(Entity entity) @safe nothrow { assert(0); }
+}
+
 class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
 	alias Components = COMPONENTS;
 	alias EntityArray(T) = Entity[];
 	staticMap!(ComponentArray, COMPONENTS) _components;
 	size_t _id = 0;
-	
-	Entity[] _deleteLaterEntities;
+
+public:
+	Entity[] _deleteLaterntities;
 	staticMap!(EntityArray, COMPONENTS) _deleteLaterComponents;
 		
 	Entity createEntity() @safe nothrow {
@@ -103,7 +120,7 @@ class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
 	}
 	
 	void deleteLater(Entity entity) @safe nothrow {
-		this._deleteLaterEntities ~= entity;
+		this._deleteLaterntities ~= entity;
 	}
 	
 	void deleteLater(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
@@ -116,10 +133,10 @@ class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
 	alias clearLater = deleteLater!COMPONENTS;
 	
 	void executeDelete() {
-		foreach(e; _deleteLaterEntities) {
+		foreach(e; _deleteLaterntities) {
 			this._destroyEntity(e);
 		}
-		_deleteLaterEntities.clear();
+		_deleteLaterntities.clear();
 		foreach(i, PC; COMPONENTS) {
 			foreach(e; _deleteLaterComponents[i]) {
 				this._components[i].remove(e);
@@ -158,7 +175,7 @@ class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
 		return this._components[IDX].get(entity);
 	}
 	
-	auto query(PCS...)() @safe nothrow if(PCS.length > 0) {
+	QueryResult!(typeof(this), PCS) query(PCS...)() @safe nothrow if(PCS.length > 0) {
 		return QueryResult!(typeof(this), PCS)(this);
 	}
 	
@@ -182,6 +199,13 @@ template staticIota(size_t start, size_t stop)
 }
 
 
+struct QueryResult(ECS, PCS...) if(PCS.length == 0) {
+	this(ECS ecs) @safe nothrow { assert(0); }
+	EntityResult!(ECS, PCS) front() @safe nothrow { assert(0); }
+	void popFront() @safe nothrow { assert(0); }
+	bool empty() const @safe nothrow { assert(0); }
+}
+
 struct QueryResult(ECS, PCS...) if(PCS.length > 0 && PCS.length <= ECS.Components.length) {
 	ECS _ecs;
 	
@@ -191,13 +215,14 @@ struct QueryResult(ECS, PCS...) if(PCS.length > 0 && PCS.length <= ECS.Component
 		// entities must be ordered (ascending)!
 		//assert(this._lookup.dup.sort == this._lookup);
 	}
-	
+
+public:
 	this(ECS ecs) @safe nothrow {
 		this._ecs = ecs;
 		this._doLinearLookup();
 	}
 	
-	auto front() @safe nothrow {
+	EntityResult!(ECS, PCS) front() @safe nothrow {
 		return _lookup[0];
 	}
 	
@@ -267,13 +292,22 @@ private:
 }
 
 
+struct EntityResult(ECS, PCS...) if(PCS.length == 0) {
+	alias entity this;
+	this(IDX_TS...)(ECS ecs, IDX_TS indices) @safe nothrow { assert(0); }
+	COMPONENT get(COMPONENT)() @safe nothrow { assert(0); }
+	alias getComponent = get;
+	Entity entity() const @safe nothrow { assert(0); }
+	void deleteLater() @safe nothrow { assert(0); }
+}
 
 struct EntityResult(ECS, PCS...) if(PCS.length > 0) {
 	enum is_size_t(T) = is(T == size_t);
 	
 	ECS _ecs;
 	staticMap!(Make_Size_t, PCS) _indices;
-	
+
+public:
 	alias entity this;
 	
 	this(IDX_TS...)(ECS ecs, IDX_TS indices) @safe nothrow if(allSatisfy!(is_size_t, IDX_TS)) {
@@ -285,17 +319,19 @@ struct EntityResult(ECS, PCS...) if(PCS.length > 0) {
 		}
 	}
 	
-	auto get(COMPONENT)() @safe nothrow {
+	COMPONENT get(COMPONENT)() @safe nothrow {
 		enum IDX_C = staticIndexOf!(COMPONENT, ECS.Components);
 		enum IDX_I = staticIndexOf!(COMPONENT, PCS);
-		
+
 		static if(IDX_C != -1 && IDX_I != -1) {
 			return this._ecs._components[IDX_C].components[_indices[IDX_I]];
 		}
 		else {
-			static assert(false, "no such component: " ~ COMPONENT.stringof);
+			static assert(false, "no such component: " ~ COMPONENT.stringof ~ ". Available are: " ~ PCS.stringof);
 		}
 	}
+	
+	alias getComponent = get;
 	
 	Entity entity() const @safe nothrow {
 		enum IDX = staticIndexOf!(PCS[0], ECS.Components);
@@ -601,14 +637,11 @@ unittest {
 
 	test_ecm.deleteLater!ComponentTwo(entity_one);
 	test_ecm.deleteLater!ComponentOne(entity_two);
-	test_ecm.deleteNow();
+	test_ecm.executeDelete();
 
     int currentIterationTwo = 1;
 	foreach(e; test_ecm.query!ComponentOne()) {
         assert(currentIterationTwo <= 2);
-
-		assert(e.hasComponent!ComponentOne()); 
-		assert(!e.hasComponent!ComponentTwo());
 
 		auto component = e.getComponent!ComponentOne();
 		Entity en = e;
@@ -620,9 +653,6 @@ unittest {
     int currentIterationThree = 1;
 	foreach(e; test_ecm.query!ComponentTwo()) {
         assert(currentIterationThree <= 1);
-		assert(!e.hasComponent!ComponentOne());
-		assert(e.hasComponent!ComponentTwo());
-
 		auto component = e.getComponent!ComponentTwo();
 		Entity en = e;
         if(currentIterationThree == 1) { assert(en.id == 1 && component.FieldOne == 3 && component.FieldTwo == "lets" && component.FieldThree == true); }
@@ -634,12 +664,9 @@ unittest {
 	assert(!test_ecm.hasComponents!ComponentOne(entity_two));
 	assert(test_ecm.hasComponents!ComponentTwo(entity_two)) ;
 
-	assert(test_ecm.isValid(entity_one));
-	assert(test_ecm.isValid(entity_two));
-
 	test_ecm.deleteLater!ComponentOne(entity_one);
 	test_ecm.deleteLater!ComponentTwo(entity_two);
-	test_ecm.deleteNow();
+	test_ecm.executeDelete();
 
 	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_one));
@@ -648,10 +675,7 @@ unittest {
 
 	test_ecm.deleteLater(entity_one);
 	test_ecm.deleteLater(entity_two);
-	test_ecm.deleteNow();
-
-	assert(!test_ecm.isValid(entity_one));
-	assert(!test_ecm.isValid(entity_two));
+	test_ecm.executeDelete();
 
 	Entity entity_emitter = test_ecm.createEntity();
 	test_ecm.addComponents(entity_emitter, ComponentThree());

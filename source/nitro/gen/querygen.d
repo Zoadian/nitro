@@ -184,7 +184,7 @@ mixin template AutoQueryMapper(alias ECM) {
 
 				}
 
-				ECM.deleteNow();
+				ECM.executeDelete();
 				return true;
 			}
 			bool autoQueryFktExecuted = AutoQueryFkt();
@@ -311,7 +311,7 @@ unittest {
     assert(component.message == "CheckSum: VC;VMC;VEC;VMEC;2VC;");
 
     autoECS.ecm.deleteLater(e);
-    autoECS.ecm.deleteNow();
+    autoECS.ecm.executeDelete();
 
     Entity e2 = autoECS.ecm.pushEntity(ComponentTwo("DeleteThis"));
 
@@ -330,7 +330,7 @@ unittest {
     assert(componentFour.message == "Sum: VCC;VMCC;VECC;VMECC;2VCC;");
 
     autoECS.ecm.deleteLater(e3);
-    autoECS.ecm.deleteNow();
+    autoECS.ecm.executeDelete();
 
     Entity e4 = autoECS.ecm.pushEntity(ComponentFive("Delete"), ComponentSix("This"));
 

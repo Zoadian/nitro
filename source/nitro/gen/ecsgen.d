@@ -126,7 +126,7 @@ version(unittest) {
                 ecm.addComponents(e, ComponentTwo("CheckpointTwo"));
             }
 
-            ecm.deleteNow();
+            ecm.executeDelete();
         }
     }
 
@@ -142,7 +142,7 @@ version(unittest) {
                 ecm.deleteLater!ComponentTwo(e);
                 ecm.addComponents(e, ComponentThree("CheckpointThree"));
             }
-            ecm.deleteNow();
+            ecm.executeDelete();
         }
     }
 
@@ -177,13 +177,8 @@ unittest {
     foreach(e; autoECS.ecm.query!ComponentTwo()) {
         assert(false);
     }
-    foreach(e; autoECS.ecm.query!ComponentTwo()) {
-        auto component = e.getComponent!ComponentThree();
-        assert(component.token == "CheckpointThree");
-        autoECS.ecm.deleteLater!ComponentThree(e);
-    }
 
-    autoECS.ecm.deleteNow();
+    autoECS.ecm.executeDelete();
 
     writeln("################## GEN.ECSGEN UNITTEST STOP  ##################");
 }
