@@ -195,8 +195,9 @@ mixin template AutoQueryMapper(alias ECM) {
 }
 
 //###################################################################################################
-/*
+
 version(unittest) {
+	import std.stdio;
     import nitro;
     @Component struct ComponentOne { string message; }
     @Component struct ComponentTwo { string message; }
@@ -212,43 +213,43 @@ version(unittest) {
             mixin AutoQueryMapper!ecm;
         }
 
-        void query(Qry!ComponentOne c) {
+        void query1(Qry!ComponentOne c) {
             assert(c.message == "CheckSum: ");
             c.message ~= "VC;";
         }
 
-        void query(ECM m, Qry!ComponentOne c) {
+        void query2(ECM m, Qry!ComponentOne c) {
             assert(c.message == "CheckSum: VC;");
             c.message ~= "VMC;";
         }
 
-        void query(Entity e, Qry!ComponentOne c) {
+        void query3(Entity e, Qry!ComponentOne c) {
             assert(e == Entity(0));
             assert(c.message == "CheckSum: VC;VMC;");
             c.message ~= "VEC;";
         }
 
-        void query(ECM m, Entity e, Qry!ComponentOne c) {
+        void query4(ECM m, Entity e, Qry!ComponentOne c) {
             assert(e == Entity(0));
             assert(c.message == "CheckSum: VC;VMC;VEC;");
             c.message ~= "VMEC;";
         }
 
-        void query(Qry!ComponentThree c, Qry!ComponentFour c2) {
+        void query5(Qry!ComponentThree c, Qry!ComponentFour c2) {
             assert(c.message == "Check: ");
             assert(c2.message == "Sum: ");
             c.message ~= "VCC;";
             c2.message ~= "VCC;";
         }
 
-        void query(ECM m, Qry!ComponentThree c, Qry!ComponentFour c2) {
+        void query6(ECM m, Qry!ComponentThree c, Qry!ComponentFour c2) {
             assert(c.message == "Check: VCC;");
             assert(c2.message == "Sum: VCC;");
             c.message ~= "VMCC;";
             c2.message ~= "VMCC;";
         }
 
-        void query(Entity e, Qry!ComponentThree c, Qry!ComponentFour c2) {
+        void query7(Qry!ComponentFour c2, Entity e, Qry!ComponentThree c) {
             assert(e == Entity(2));
             assert(c.message == "Check: VCC;VMCC;");
             assert(c2.message == "Sum: VCC;VMCC;");
@@ -256,7 +257,7 @@ version(unittest) {
             c2.message ~= "VECC;";
         }
 
-        void query(ECM m, Entity e, Qry!ComponentThree c, Qry!ComponentFour c2) {
+        void query8(Qry!ComponentThree c, Entity e, Qry!ComponentFour c2, ECM m) {
             assert(e == Entity(2));
             assert(c.message == "Check: VCC;VMCC;VECC;");
             assert(c2.message == "Sum: VCC;VMCC;VECC;");
@@ -317,9 +318,6 @@ unittest {
 
     autoECS.run();
 
-    assert(!autoECS.ecm.isValid(e));
-    assert(!autoECS.ecm.isValid(e2));
-
     Entity e3 = autoECS.ecm.pushEntity(ComponentThree("Check: "), ComponentFour("Sum: "));
 
     autoECS.run();
@@ -336,11 +334,5 @@ unittest {
 
     autoECS.run();
 
-    assert(!autoECS.ecm.isValid(e));
-    assert(!autoECS.ecm.isValid(e2));
-    assert(!autoECS.ecm.isValid(e3));
-    assert(!autoECS.ecm.isValid(e4));
-
     writeln("################## GEN.QUERYGEN UNITTEST STOP  ##################");
 }
-*/
