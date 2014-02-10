@@ -469,7 +469,6 @@ version(unittest) {
         }
 
         void run(ECM ecm) {
-			version(none) {
             runCountSystemTwo++;
 
             int countComponentThreeFound = 0;
@@ -477,17 +476,17 @@ version(unittest) {
                 assert(runCountSystemOne == 2);
                 countComponentThreeFound++;
 
-                Entity en = e;
-                if(e.hasComponent!ComponentOne()) {
-                    assert(!e.hasComponent!ComponentTwo());
-                    auto component = e.getComponent!ComponentOne();
-                    if(runCountSystemOne == 2) { assert(en.id == 5 && component.FieldOne == 10 && component.FieldTwo == "a" && component.FieldThree == true); }
-                }
-                if(e.hasComponent!ComponentTwo()) {
-                    assert(!e.hasComponent!ComponentOne());
-                    auto component = e.getComponent!ComponentTwo();
-                    if(runCountSystemOne == 2) { assert(en.id == 6 && component.FieldOne == 11 && component.FieldTwo == "b" && component.FieldThree == false); }
-                }
+//                Entity en = e;
+//                if(e.hasComponent!ComponentOne()) {
+//                    assert(!e.hasComponent!ComponentTwo());
+//                    auto component = e.getComponent!ComponentOne();
+//                    if(runCountSystemOne == 2) { assert(en.id == 5 && component.FieldOne == 10 && component.FieldTwo == "a" && component.FieldThree == true); }
+//                }
+//                if(e.hasComponent!ComponentTwo()) {
+//                    assert(!e.hasComponent!ComponentOne());
+//                    auto component = e.getComponent!ComponentTwo();
+//                    if(runCountSystemOne == 2) { assert(en.id == 6 && component.FieldOne == 11 && component.FieldTwo == "b" && component.FieldThree == false); }
+//                }
                 ecm.clearLater(e);
             }
 
@@ -500,7 +499,6 @@ version(unittest) {
 
 
 			ecm.executeDelete();
-			}
         }
     }
 
