@@ -117,8 +117,6 @@ version(unittest) {
     @System final class ECSGEN_SystemOne(ECM) {
         void run(ECM ecm) {
             foreach(e; ecm.query!ECSGEN_ComponentTwo()) {
-				import std.stdio;
-				writeln(e);
                 assert(false);
             }
             foreach(e; ecm.query!ECSGEN_ComponentOne()) {

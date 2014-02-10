@@ -602,8 +602,7 @@ unittest {
 	assert(test_ecm.hasComponents!(ComponentOne,ComponentTwo)(entity_two));
 
 	auto component_one = test_ecm.getComponent!ComponentOne(entity_one);
-	component_one.writeln();
-    assert(component_one.FieldOne == 1 && component_one.FieldTwo == "hi" && component_one.FieldThree == true);
+    assert(component_one.FieldOne == 4 && component_one.FieldTwo == "go" && component_one.FieldThree == false);
 
 	Entity entity_four = test_ecm.createEntity();
 	test_ecm.addComponents(entity_four, ComponentOne(6, "is", false));
@@ -617,7 +616,7 @@ unittest {
 
 		auto component = e.getComponent!ComponentOne();
 		Entity en = cast(Entity)e;
-        if(currentIteration == 1) { assert(en.id == 0 && component.FieldOne == 1 && component.FieldTwo == "hi" && component.FieldThree == true); }
+        if(currentIteration == 1) { assert(en.id == 0 && component.FieldOne == 4 && component.FieldTwo == "go" && component.FieldThree == false); }
         if(currentIteration == 2) { assert(en.id == 1 && component.FieldOne == 2 && component.FieldTwo == "ho" && component.FieldThree == false); }
         if(currentIteration == 3) { assert(en.id == 3 && component.FieldOne == 6 && component.FieldTwo == "is" && component.FieldThree == false); }
 
@@ -645,7 +644,7 @@ unittest {
 
 		auto component = e.getComponent!ComponentOne();
 		Entity en = e;
-        if(currentIterationTwo == 1) { assert(en.id == 0 && component.FieldOne == 1 && component.FieldTwo == "hi" && component.FieldThree == true); }
+        if(currentIterationTwo == 1) { assert(en.id == 0 && component.FieldOne == 4 && component.FieldTwo == "go" && component.FieldThree == false); }
         if(currentIterationTwo == 2) { assert(en.id == 1 && component.FieldOne == 3 && component.FieldTwo == "lets" && component.FieldThree == true); }
         currentIterationTwo++;
 	}
