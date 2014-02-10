@@ -114,16 +114,18 @@ mixin template MakeECS(string SYMBOL_NAME, string MODULE_LIST) {
 //###################################################################################################
 
 version(unittest) {
-    @System final class SystemOne(ECM) {
+    @System final class ECSGEN_SystemOne(ECM) {
         void run(ECM ecm) {
-            foreach(e; ecm.query!ComponentTwo()) {
+            foreach(e; ecm.query!ECSGEN_ComponentTwo()) {
+				import std.stdio;
+				writeln(e);
                 assert(false);
             }
-            foreach(e; ecm.query!ComponentOne()) {
-                auto component = e.getComponent!ComponentOne();
+            foreach(e; ecm.query!ECSGEN_ComponentOne()) {
+                auto component = e.getComponent!ECSGEN_ComponentOne();
                 assert(component.token == "CheckpointOne");
-                ecm.deleteLater!ComponentOne(e);
-                ecm.addComponents(e, ComponentTwo("CheckpointTwo"));
+                ecm.deleteLater!ECSGEN_ComponentOne(e);
+                ecm.addComponents(e, ECSGEN_ComponentTwo("CheckpointTwo"));
             }
 
             ecm.executeDelete();
@@ -131,30 +133,30 @@ version(unittest) {
     }
 
 
-    @System final class SystemTwo(ECM) {
+    @System final class ECSGEN_SystemTwo(ECM) {
         void run(ECM ecm) {
-            foreach(e; ecm.query!ComponentOne()) {
+            foreach(e; ecm.query!ECSGEN_ComponentOne()) {
                 assert(false);
             }
-            foreach(e; ecm.query!ComponentTwo()) {
-                auto component = e.getComponent!ComponentTwo();
+            foreach(e; ecm.query!ECSGEN_ComponentTwo()) {
+                auto component = e.getComponent!ECSGEN_ComponentTwo();
                 assert(component.token == "CheckpointTwo");
-                ecm.deleteLater!ComponentTwo(e);
-                ecm.addComponents(e, ComponentThree("CheckpointThree"));
+                ecm.deleteLater!ECSGEN_ComponentTwo(e);
+                ecm.addComponents(e, ECSGEN_ComponentThree("CheckpointThree"));
             }
             ecm.executeDelete();
         }
     }
 
-    @Component struct ComponentOne {
+    @Component struct ECSGEN_ComponentOne {
         string token;
     }
 
-    @Component struct ComponentTwo {
+    @Component struct ECSGEN_ComponentTwo {
         string token;
     }
 
-    @Component struct ComponentThree {
+    @Component struct ECSGEN_ComponentThree {
         string token;
     }
 }
@@ -167,14 +169,13 @@ unittest {
 	mixin MakeECS!("autoECS", "nitro.gen.ecsgen");
 
 	Entity entity = autoECS.ecm.createEntity();
-    autoECS.ecm.addComponents(entity, ComponentOne("CheckpointOne"));
-
+    autoECS.ecm.addComponents(entity, ECSGEN_ComponentOne("CheckpointOne"));
 	autoECS.run();
 
-    foreach(e; autoECS.ecm.query!ComponentOne()) {
+    foreach(e; autoECS.ecm.query!ECSGEN_ComponentOne()) {
         assert(false);
     }
-    foreach(e; autoECS.ecm.query!ComponentTwo()) {
+    foreach(e; autoECS.ecm.query!ECSGEN_ComponentTwo()) {
         assert(false);
     }
 
