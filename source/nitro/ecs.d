@@ -1,370 +1,312 @@
 ﻿module nitro.ecs;
-
-import std.stdio;
-import std.conv;
 import std.typetuple;
-import std.array;
+import std.stdio;
+import std.algorithm;
+import std.range;
 
-public import nitro.soa;
 
-
-/****************************************************************
-*/
-struct Entity { 
+struct Entity {	
 private:
-	size_t id; 
-
-private:
-	int opCmp(ref const Entity entity) const {
-        if(this.id < entity.id)
-            return -1;
-        else if(entity.id < this.id)
-            return 1;
-
-        return 0;
+	size_t id;
+	
+	int opCmp(ref const Entity entity) const @safe nothrow {
+		if(this.id < entity.id)
+			return -1;
+		else if(entity.id < this.id)
+			return 1;
+		
+		return 0;
 	}
 }
 
+struct ComponentA {
+	string a;
+}
 
-/****************************************************************
-*/
-private struct ComponentBits(CS...) { 
-private:
-	ubyte[CS.length / 8 + 1] _bits;
+struct ComponentB {
+	string b;
+}
+
+struct ComponentC {
+	string c;
+}
+
+struct ComponentArray(COMPONENT) {
+	Entity[] entities;
+	COMPONENT[] components; //might be stored as SOA later
 	
-public:	   	   
-	void set(CSS...)() @safe nothrow { 
-		foreach(C; CSS) {
-			this._set!C();			
+	void add(Entity entity, COMPONENT component) @trusted nothrow {
+		try {
+			auto idx = this.entities.countUntil(entity);
+			if(idx != -1) {
+				this.entities.insertInPlace(idx, entity);
+				this.components.insertInPlace(idx, component);
+			}
+			else {
+				this.entities ~= entity;
+				this.components ~= component;
+			}
 		}
-	}				 
-	
-	void unset(CSS...)() @safe nothrow {
-		foreach(C; CSS) {
-			this._unset!C();			
+		catch(Exception e) {
 		}
 	}
 	
-	bool isset(CSS...)() const @safe nothrow {
-		foreach(C; CSS) {
-			if(!this._isset!C()) return false;			
+	void remove(Entity entity) @trusted nothrow {
+		try {
+			auto idx = this.entities.countUntil(entity);
+			if(idx != -1) {
+				this.entities.remove!(SwapStrategy.stable)(idx);
+				this.components.remove!(SwapStrategy.stable)(idx);
+			}
 		}
-		return true;
+		catch(Exception e) {
+		}
 	}
 	
-	void clear() @safe nothrow {
-		this._bits = this._bits.init;
+	bool has(Entity entity) const @trusted nothrow {
+		try {
+			auto idx = this.entities.countUntil(entity);
+			return idx != -1;
+		}
+		catch(Exception e) {
+			return false;
+		}
+	}
+
+	COMPONENT get(Entity entity) @trusted {
+		auto idx = this.entities.countUntil(entity);
+		if(idx == -1) {
+			throw new Exception("entity not found");
+		}
+		return this.components[idx];
 	}
 	
-private:	
-	void _set(C)() @safe nothrow { 
-		alias IDX = staticIndexOf!(C, CS);
-		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
-		this._bits[IDX / 8] |=  1 << (IDX % 8);
-	}
-	
-	void _unset(C)() @safe nothrow {	   
-		alias IDX = staticIndexOf!(C, CS);
-		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);	 
-		this._bits[IDX / 8] &= ~(1 << (IDX % 8));
-	}
-	
-	bool _isset(C)() const @safe nothrow {		
-		alias IDX = staticIndexOf!(C, CS);
-		static assert(IDX != -1, C.stringof ~ " is not a component of " ~ typeof(this).stringof);
-		return (this._bits[IDX / 8] & (1 << (IDX % 8))) > 0;
+	invariant() {
+		// components must be ordered (ascending)!
+		assert(this.entities.dup.sort == this.entities);
+		// entity and component array must have same length!
+		assert(this.entities.length == this.components.length);
 	}
 }
 
-
-/****************************************************************
-*/
-private struct EntityComponentPair(C) {
-	Entity[] entities; 
-	SoAArray!C components;
-};
-
-
-/****************************************************************
-*/
-private template EntityComponentPairs(CS...) {
-	alias EntityComponentPairs = staticMap!(EntityComponentPair, CS);
-}
-
-
-/****************************************************************
-*/
-class EntityComponentManager(CS...) if(CS.length == 0) {
-	void deleteLater(Entity entity) @safe nothrow {}
-	void deleteLater(PCS...)(Entity entity) @safe nothrow {}
-	alias clearLater = deleteLater!CS;
-	void deleteNow() @safe nothrow {}
-	Entity createEntity() @safe nothrow { assert(0); }
-	bool isValid(Entity entity) const @safe nothrow { assert(0); }
-	bool hasComponents(PCS...)(Entity entity) const @safe nothrow { assert(0); }
-	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow {}
-	ref PC getComponent(PC)(Entity entity) @safe nothrow { assert(0); }
-	QueryResult!(Entity[], CS) query(PCS...)() @safe nothrow { assert(0); }
-}
-
-/****************************************************************
-*/
-class EntityComponentManager(CS...) if(CS.length > 0) {
-private:
-	size_t _nextId = 0;
-	ComponentBits!CS[Entity] _mapEntityComponentBits;
-	EntityComponentPairs!CS _entityComponentPairs;
-
+class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
+	alias Components = COMPONENTS;
+	alias EntityArray(T) = Entity[];
+	staticMap!(ComponentArray, COMPONENTS) _components;
+	size_t _id = 0;
+	
 	Entity[] _deleteLaterEntities;
-	ComponentBits!CS[Entity] _deleteLaterComponents;
-
-public:
-	/************************************************************
-	*/
+	staticMap!(EntityArray, COMPONENTS) _deleteLaterComponents;
+		
+	Entity createEntity() @safe nothrow {
+		return Entity(_id++);
+	}
+	
 	void deleteLater(Entity entity) @safe nothrow {
 		this._deleteLaterEntities ~= entity;
 	}
-
-	/************************************************************
-	*/
-	void deleteLater(PCS...)(Entity entity) @safe nothrow {
-		auto p = entity in this._deleteLaterComponents;
-		if(p is null) {
-			this._deleteLaterComponents[entity] = ComponentBits!CS();
+	
+	void deleteLater(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
+		foreach(i, PC; PCS) {
+			enum IDX = staticIndexOf!(PC, COMPONENTS);
+			this._deleteLaterComponents[IDX] ~= entity;
 		}
-		this._deleteLaterComponents[entity].set!PCS();
+	}
+	
+	alias clearLater = deleteLater!COMPONENTS;
+	
+	void executeDelete() {
+		foreach(e; _deleteLaterEntities) {
+			this._destroyEntity(e);
+		}
+		_deleteLaterEntities.clear();
+		foreach(i, PC; COMPONENTS) {
+			foreach(e; _deleteLaterComponents[i]) {
+				this._components[i].remove(e);
+			}
+			_deleteLaterComponents[i].clear();
+		}		
+	}
+	
+	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) {
+		foreach(i, PC; PCS) {
+			enum IDX = staticIndexOf!(PC, COMPONENTS);
+			this._components[IDX].add(entity, pcs[i]);
+		}
+	}
+	
+	void removeComponents(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
+		foreach(i, PC; PCS) {
+			enum IDX = staticIndexOf!(PC, COMPONENTS);
+			this._components[IDX].remove(entity);
+		}
+	}
+	
+	bool hasComponents(PCS...)(Entity entity) const @safe nothrow if(PCS.length > 0) {
+		foreach(i, PC; PCS) {
+			enum IDX = staticIndexOf!(PC, COMPONENTS);
+			if(this._components[IDX].has(entity) == false) {
+				return false;
+			}
+		}
+		return true;
 	}
 
-	/************************************************************
-	*/
-	alias clearLater = deleteLater!CS;
+	PC getComponent(PC)(Entity entity) @safe {
+		enum IDX = staticIndexOf!(PC, COMPONENTS);
+		static assert(IDX != -1, "not fou");
+		return this._components[IDX].get(entity);
+	}
+	
+	auto query(PCS...)() @safe nothrow if(PCS.length > 0) {
+		return QueryResult!(typeof(this), PCS)(this);
+	}
+	
+private:		
+	void _destroyEntity(Entity entity) @safe nothrow {
+		foreach(ref c; _components) {
+			c.remove(entity);
+		}
+	}
+}
 
-	/************************************************************
-	*/
-	void deleteNow() {
-		foreach(e; this._deleteLaterComponents.byKey()) {
-			foreach(C; CS) {
-				if(this._deleteLaterComponents[e].isset!C()) {
-					this._removeComponents!C(e);
+private alias Make_Size_t(T) = size_t;
+
+
+template staticIota(size_t start, size_t stop)
+{
+	static if (stop <= start)
+		alias TypeTuple!() staticIota;
+	else
+		alias TypeTuple!(staticIota!(start, stop-1), stop-1) staticIota;
+}
+
+
+struct QueryResult(ECS, PCS...) if(PCS.length > 0 && PCS.length <= ECS.Components.length) {
+	ECS _ecs;
+	
+	EntityResult!(ECS, PCS)[] _lookup;
+	
+	invariant() {
+		// entities must be ordered (ascending)!
+		//assert(this._lookup.dup.sort == this._lookup);
+	}
+	
+	this(ECS ecs) @safe nothrow {
+		this._ecs = ecs;
+		this._doLinearLookup();
+	}
+	
+	auto front() @safe nothrow {
+		return _lookup[0];
+	}
+	
+	void popFront() @safe nothrow {
+		this._lookup.popFront();
+	}
+	
+	bool empty() const @safe nothrow {
+		return this._lookup.empty;
+	}
+	
+private:	
+	// O(m+n)
+	// see http://codercareer.blogspot.de/2011/11/no-24-intersection-of-sorted-arrays.html
+	void _doLinearLookup() @trusted {
+		static if(PCS.length == 1) {
+			foreach(i, e; _ecs._components[0].entities) {
+				this._lookup ~= EntityResult!(ECS, PCS)(_ecs, i);
+			}
+		}
+		else {
+			staticMap!(Make_Size_t, PCS) indices;
+			
+			bool checkEnd() @safe nothrow {
+				foreach(i, P; PCS) {
+					enum IDX_C = staticIndexOf!(P, ECS.Components);
+					if(indices[i] >=  this._ecs._components[IDX_C].entities.length) {
+						return false;
+					}
+				}
+				return true;
+			}
+			
+			bool checkEqual() @safe nothrow {
+				foreach(i; staticIota!(1, PCS.length)) {
+					enum IDX_C_A = staticIndexOf!(PCS[0], ECS.Components);
+					enum IDX_C_B = staticIndexOf!(PCS[i], ECS.Components);
+					if(_ecs._components[IDX_C_A].entities[indices[0]] != _ecs._components[IDX_C_B].entities[indices[i]]) {
+						return false;
+					}
+				}
+				return true;
+			}
+			
+			while(checkEnd()) {
+				if(checkEqual()) {
+					this._lookup ~= EntityResult!(ECS, PCS)(_ecs, indices);
+					foreach(ref idx; indices) {
+						++idx;
+					}
+				}
+				else {
+					//increment index of lowest entity
+					size_t* pIdx = &indices[0];
+					foreach(i; staticIota!(1, PCS.length)) {
+						enum IDX_C_A = staticIndexOf!(PCS[i], ECS.Components);
+						enum IDX_C_B = staticIndexOf!(PCS[i -  1], ECS.Components);
+						if(_ecs._components[IDX_C_A].entities[indices[i]] < _ecs._components[IDX_C_B].entities[indices[i - 1]]) {
+							pIdx = &indices[i];
+						}
+					}
+					++(*pIdx);
 				}
 			}
 		}
-		foreach(e; this._deleteLaterEntities) {
-			this._destroyEntity(e);
-		}
-		this._deleteLaterComponents.clear();
-		this._deleteLaterEntities.clear();
-	}
-
-	/************************************************************
-	*/
-	Entity createEntity() @safe nothrow {
-		auto e = Entity(_nextId++);
-		_mapEntityComponentBits[e] = ComponentBits!CS();
-		return e;
-	}
-	
-	/************************************************************
-	*/
-	bool isValid(Entity entity) const @safe nothrow {
-		return (entity in this._mapEntityComponentBits) !is null;
-	}
-
-	/************************************************************
-	*/
-	bool hasComponents(PCS...)(Entity entity) const @safe nothrow
-	in {
-		assert(this.isValid(entity));
-	}
-	body {
-		foreach(PC; PCS) {
-			alias IDX = staticIndexOf!(PC, CS);
-			import std.algorithm : canFind;
-			assert(this._entityComponentPairs[IDX].entities.canFind(entity) == this._mapEntityComponentBits[entity].isset!PC(), "mismatch: component bits and component arrays!");
-		}
-		return this._mapEntityComponentBits[entity].isset!PCS();
-	}
-
-	/************************************************************
-	*/
-	void addComponents(PCS...)(Entity entity, PCS pcs)
-	in {
-		assert(this.isValid(entity));
-		assert(!this.hasComponents!PCS(entity));
-	}
-	out {
-		assert(this.hasComponents!PCS(entity));
-	}
-	body {
-		import std.algorithm : countUntil;
-		import std.array : insertInPlace;
-		foreach(i, PC; PCS) {		
-			alias IDX = staticIndexOf!(PC, CS);
-			static assert(IDX != -1, "Component " ~ PC.stringof ~ " not known to ECM");
-
-			auto idx = _entityComponentPairs[IDX].entities.countUntil!(a => a > entity);
-			if(idx != -1) {
-				_entityComponentPairs[IDX].entities.insertInPlace(idx, entity);
-				_entityComponentPairs[IDX].components.insertInPlace(idx, pcs[i]);
-			}
-			else {
-				_entityComponentPairs[IDX].entities ~= entity;
-				_entityComponentPairs[IDX].components ~= pcs[i];
-			}
-		}
-		this._mapEntityComponentBits[entity].set!PCS();
-	}
-
-	/************************************************************
-	*/
-	auto getComponent(PC)(Entity entity)
-	in {
-		assert(this.isValid(entity));
-		assert(this.hasComponents!PC(entity));
-	}
-	body {	
-		import std.algorithm : countUntil;
-		alias IDX = staticIndexOf!(PC, CS);
-		auto idx = this._entityComponentPairs[IDX].entities.countUntil(entity);
-		if(idx == -1) throw new Exception("entity not found. this should not happen!");
-		return this._entityComponentPairs[IDX].components[idx];
-	}
-
-	/************************************************************
-	*/
-	auto query(PCS...)() {
-		import std.algorithm : filter, sort;
-		auto entities = this._mapEntityComponentBits.byKey.filter!(e => this.hasComponents!PCS(e))().array.sort;
-		return QueryResult!(typeof(entities), CS)(entities, this);
-	}
-
-private:
-	/************************************************************
-	*/
-	void _destroyEntity(Entity entity) 
-	in {
-		assert(this.isValid(entity));
-	}
-	out {
-		assert(!this.isValid(entity));
-	}
-	body {
-		this._clearComponents(entity);
-		this._mapEntityComponentBits.remove(entity);
-	}
-	
-	/************************************************************
-	*/
-	void _removeComponents(PCS...)(Entity entity)
-	in {
-		assert(this.isValid(entity));
-	}
-	out {
-		assert(!this.hasComponents!PCS(entity));
-	}
-	body {	   
-		import std.algorithm : remove, countUntil;
-		foreach(c, PC; PCS) {
-			alias IDX = staticIndexOf!(PC, CS);
-			auto idx = _entityComponentPairs[IDX].entities.countUntil(entity);
-			if(idx != -1) {
-				_entityComponentPairs[IDX].entities.remove(idx);
-				_entityComponentPairs[IDX].components.remove(idx);
-			}
-		}
-		this._mapEntityComponentBits[entity].unset!PCS();
-	}
-	
-	/************************************************************
-	*/
-	alias _clearComponents = _removeComponents!CS;
-}
-
-
-/****************************************************************
-*/
-struct QueryResult(R, CS...) {
-
-	size_t[CS.length] indices;
-	R _range;
-	EntityComponentManager!CS _ecm;
-
-	/************************************************************
-	*/
-	this(R range, EntityComponentManager!CS ecm) @safe nothrow {
-		this._range = range;
-		this._ecm = ecm;
-	}
-	
-	/************************************************************
-	*/
-	EntityResult!CS front() @property @safe nothrow {
-		return EntityResult!CS(_range.front, &indices, _ecm);
-	}
-	
-	/************************************************************
-	*/
-	void popFront() @safe nothrow {
-		this._range.popFront();
-	}
-	
-	/************************************************************
-	*/
-	bool empty() const @property @safe nothrow {
-		return this._range.empty;
 	}
 }
 
 
-/****************************************************************
-*/
-struct EntityResult(CS...) if(CS.length == 0) {
-    Entity _e = Entity(0);
-    alias _e this;
-	this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm) @safe nothrow {}
-	ref PCS getComponent(PCS)() @safe nothrow { assert(0); }
-	bool hasComponent(PCS...)() @safe nothrow { assert(0); }
-}
 
-/****************************************************************
-*/
-struct EntityResult(CS...) if(CS.length > 0) {
-public:
-	Entity _e;
-	alias _e this;
-
-private:
-	size_t[CS.length]* _pIndices;
-	EntityComponentManager!CS _ecm;
-
-	/************************************************************
-	*/
-	this(Entity e, size_t[CS.length]* pIndices, EntityComponentManager!CS ecm) @safe nothrow {
-		this._e = e;
-		this._pIndices = pIndices;
-		this._ecm = ecm;
-	}
+struct EntityResult(ECS, PCS...) if(PCS.length > 0) {
+	enum is_size_t(T) = is(T == size_t);
+	
+	ECS _ecs;
+	staticMap!(Make_Size_t, PCS) _indices;
+	
+	alias entity this;
+	
+	this(IDX_TS...)(ECS ecs, IDX_TS indices) @safe nothrow if(allSatisfy!(is_size_t, IDX_TS)) {
+		this._ecs = ecs;
 		
-	/************************************************************
-	if there is no such component for this entity an exception is thrown
-	*/
-	auto getComponent(PCS)() {
-		enum IDX = staticIndexOf!(PCS, CS);
-		static assert(IDX != -1, PCS.stringof ~ "Component is not part of " ~ CS.stringof);
-		for(;(*this._pIndices)[IDX] < _ecm._entityComponentPairs[IDX].entities.length; ++((*this._pIndices)[IDX])) {
-			if(_ecm._entityComponentPairs[IDX].entities[(*this._pIndices)[IDX]] == this._e) {
-				return _ecm._entityComponentPairs[IDX].components[(*this._pIndices)[IDX]];
-			}
+		static assert(indices.length == IDX_TS.length);
+		foreach(i, TK; IDX_TS) {
+			this._indices[i] = indices[i];
 		}
-		throw new Exception("no such component for entity");
 	}
-
-	/************************************************************
-	*/
-	bool hasComponent(PCS...)() @safe nothrow {
-		return _ecm.hasComponents!PCS(_e);
+	
+	auto get(COMPONENT)() @safe nothrow {
+		enum IDX_C = staticIndexOf!(COMPONENT, ECS.Components);
+		enum IDX_I = staticIndexOf!(COMPONENT, PCS);
+		
+		static if(IDX_C != -1 && IDX_I != -1) {
+			return this._ecs._components[IDX_C].components[_indices[IDX_I]];
+		}
+		else {
+			static assert(false, "no such component: " ~ COMPONENT.stringof);
+		}
+	}
+	
+	Entity entity() const @safe nothrow {
+		enum IDX = staticIndexOf!(PCS[0], ECS.Components);
+		return this._ecs._components[IDX].entities[_indices[0]];
+	}
+	
+	void deleteLater() @safe nothrow {
+		this._ecs.deleteLater(entity);
 	}
 }
+
 
 
 /****************************************************************
@@ -476,7 +418,7 @@ version(unittest) {
                 assert(countComponentThreeFound == 0); 
             }
 
-            ecm.deleteNow();
+			ecm.executeDelete();
         }
     }
 
@@ -491,6 +433,7 @@ version(unittest) {
         }
 
         void run(ECM ecm) {
+			version(none) {
             runCountSystemTwo++;
 
             int countComponentThreeFound = 0;
@@ -520,7 +463,8 @@ version(unittest) {
             }
 
 
-            ecm.deleteNow();
+			ecm.executeDelete();
+			}
         }
     }
 
@@ -579,16 +523,9 @@ unittest {
 	Entity entity_two = test_ecm.createEntity();
 	Entity entity_three = test_ecm.createEntity();
 
-    assert(test_ecm.isValid(entity_one));
-    assert(test_ecm.isValid(entity_two));
-    assert(test_ecm.isValid(entity_three));
 
 	test_ecm.deleteLater(entity_three);
-	test_ecm.deleteNow();
-
-    assert(test_ecm.isValid(entity_one));
-    assert(test_ecm.isValid(entity_two));
-    assert(!test_ecm.isValid(entity_three));
+	test_ecm.executeDelete();
 
 	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_two));
@@ -603,7 +540,7 @@ unittest {
 	assert(!test_ecm.hasComponents!(ComponentOne,ComponentTwo)(entity_one));
 
 	test_ecm.deleteLater!ComponentOne(entity_one);
-	test_ecm.deleteNow();
+	test_ecm.executeDelete();
 
 	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_one));
@@ -641,9 +578,6 @@ unittest {
     int currentIteration = 1;
 	foreach(e; test_ecm.query!(ComponentOne, ComponentTwo)()) {
         assert(currentIteration <= 3);
-
-		assert(e.hasComponent!ComponentOne());
-		assert(e.hasComponent!ComponentTwo());
 
 		auto component = e.getComponent!ComponentOne();
 		Entity en = cast(Entity)e;
