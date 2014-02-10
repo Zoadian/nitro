@@ -102,7 +102,7 @@ class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length == 0) {
 	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) { assert(0); }
 	void removeComponents(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) { assert(0); }
 	bool hasComponents(PCS...)(Entity entity) const @safe nothrow if(PCS.length > 0) { assert(0); }
-	PC getComponent(PC)(Entity entity) @safe { assert(0); }
+	Accessor!PC getComponent(PC)(Entity entity) @safe { assert(0); }
 	QueryResult!(typeof(this), COMPONENTS) query(PCS...)() @safe nothrow { assert(0); }
 	void _destroyEntity(Entity entity) @safe nothrow { assert(0); }
 }
@@ -298,7 +298,7 @@ private:
 struct EntityResult(ECS, PCS...) if(PCS.length == 0) {
 	alias entity this;
 	this(IDX_TS...)(ECS ecs, IDX_TS indices) @safe nothrow { assert(0); }
-	COMPONENT get(COMPONENT)() @safe nothrow { assert(0); }
+	Accessor!COMPONENT get(COMPONENT)() @safe nothrow { assert(0); }
 	alias getComponent = get;
 	Entity entity() const @safe nothrow { assert(0); }
 	void deleteLater() @safe nothrow { assert(0); }
