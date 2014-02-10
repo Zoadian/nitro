@@ -37,7 +37,7 @@ struct ComponentArray(COMPONENT) {
 	
 	void add(Entity entity, COMPONENT component) @trusted nothrow {
 		try {
-			auto idx = this.entities.countUntil(entity);
+			auto idx = countUntil!((a,b) => a > b)(this.entities, entity);
 			if(idx != -1) {
 				this.entities.insertInPlace(idx, entity);
 				this.components.insertInPlace(idx, component);
@@ -55,8 +55,8 @@ struct ComponentArray(COMPONENT) {
 		try {
 			auto idx = this.entities.countUntil(entity);
 			if(idx != -1) {
-				this.entities.remove!(SwapStrategy.stable)(idx);
-				this.components.remove!(SwapStrategy.stable)(idx);
+				this.entities = this.entities.remove!(SwapStrategy.stable)(idx);
+				this.components = this.components.remove!(SwapStrategy.stable)(idx);
 			}
 		}
 		catch(Exception e) {
@@ -241,8 +241,6 @@ private:
 		static if(PCS.length == 1) {
 			enum IDX_C = staticIndexOf!(PCS, ECS.Components);
 			foreach(i, e; _ecs._components[IDX_C].entities) {
-//				import std.exception;
-//				e.writeln("   ", PCS.stringof, "    ,", ECS.Components.stringof, "  ", IDX_C, "   ", _ecs._components[IDX_C].entities).collectException();
 				this._lookup ~= EntityResult!(ECS, PCS)(_ecs, i);
 			}
 		}
@@ -604,6 +602,7 @@ unittest {
 	assert(test_ecm.hasComponents!(ComponentOne,ComponentTwo)(entity_two));
 
 	auto component_one = test_ecm.getComponent!ComponentOne(entity_one);
+	component_one.writeln();
     assert(component_one.FieldOne == 1 && component_one.FieldTwo == "hi" && component_one.FieldThree == true);
 
 	Entity entity_four = test_ecm.createEntity();
