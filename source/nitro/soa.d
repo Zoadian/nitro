@@ -55,7 +55,7 @@ struct Accessor(T) {
 	SOA_PTRS _pData;
 	size_t _idx;
 		
-	this(K...)(size_t idx, ref K k) nothrow {
+	this(K...)(size_t idx, ref K k) @trusted nothrow {
 		_idx = idx;
 		foreach(i, P; K) {
 			static if(isPointer!(P)) {
@@ -142,9 +142,9 @@ struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 		fnAssign!(0)(t);
 	}
 
-	void insertInPlace(size_t pos, T t) nothrow {
+	void insertInPlace(size_t pos, T t) @safe nothrow {
 
-		void fnAssign(size_t idx, X)(X x) nothrow {		
+		void fnAssign(size_t idx, X)(X x) @trusted nothrow {		
 			import std.array : insertInPlace;
 			foreach(i, F; FieldTypeTuple!X) {
 				enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
@@ -174,7 +174,7 @@ struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 	}
 	
 	
-	Accessor!(T) opIndex(size_t idx) nothrow {
+	Accessor!(T) opIndex(size_t idx) @safe nothrow {
 		return Accessor!(T)(idx, _data);
 	}
 }

@@ -4,6 +4,7 @@ import std.stdio;
 import std.algorithm;
 import std.range;
 
+public import nitro.soa;
 
 struct Entity {	
 private:
@@ -33,7 +34,7 @@ struct ComponentC {
 
 struct ComponentArray(COMPONENT) {
 	Entity[] entities;
-	COMPONENT[] components; //might be stored as SOA later
+	SoAArray!COMPONENT components; //might be stored as SOA later
 	
 	void add(Entity entity, COMPONENT component) @trusted nothrow {
 		try {
@@ -56,7 +57,8 @@ struct ComponentArray(COMPONENT) {
 			auto idx = this.entities.countUntil(entity);
 			if(idx != -1) {
 				this.entities = this.entities.remove!(SwapStrategy.stable)(idx);
-				this.components = this.components.remove!(SwapStrategy.stable)(idx);
+				//WARNING: this must be assigned to this.components if SOA is not used!
+				this.components.remove!(SwapStrategy.stable)(idx);
 			}
 		}
 		catch(Exception e) {
@@ -73,7 +75,7 @@ struct ComponentArray(COMPONENT) {
 		}
 	}
 
-	COMPONENT get(Entity entity) @trusted {
+	Accessor!COMPONENT get(Entity entity) @trusted {
 		auto idx = this.entities.countUntil(entity);
 		if(idx == -1) {
 			throw new Exception("entity not found");
@@ -169,7 +171,7 @@ public:
 		return true;
 	}
 
-	PC getComponent(PC)(Entity entity) @safe {
+	Accessor!PC getComponent(PC)(Entity entity) @safe {
 		enum IDX = staticIndexOf!(PC, COMPONENTS);
 		static assert(IDX != -1, "not fou");
 		return this._components[IDX].get(entity);
@@ -320,7 +322,7 @@ public:
 		}
 	}
 	
-	COMPONENT get(COMPONENT)() @safe nothrow {
+	Accessor!COMPONENT get(COMPONENT)() @safe nothrow {
 		enum IDX_C = staticIndexOf!(COMPONENT, ECS.Components);
 		enum IDX_I = staticIndexOf!(COMPONENT, PCS);
 
