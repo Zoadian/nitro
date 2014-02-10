@@ -239,7 +239,10 @@ private:
 	// see http://codercareer.blogspot.de/2011/11/no-24-intersection-of-sorted-arrays.html
 	void _doLinearLookup() @trusted {
 		static if(PCS.length == 1) {
-			foreach(i, e; _ecs._components[0].entities) {
+			enum IDX_C = staticIndexOf!(PCS, ECS.Components);
+			foreach(i, e; _ecs._components[IDX_C].entities) {
+//				import std.exception;
+//				e.writeln("   ", PCS.stringof, "    ,", ECS.Components.stringof, "  ", IDX_C, "   ", _ecs._components[IDX_C].entities).collectException();
 				this._lookup ~= EntityResult!(ECS, PCS)(_ecs, i);
 			}
 		}
