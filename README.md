@@ -109,6 +109,7 @@ All parts of nitro are released under the [Boost software license - version 1.0]
 ## Todo
 
 * Finish readme
-* Usage of SoA implementation
+* Support empty components
 * Add implementation notes to readme
+* Code cleanup
 * Release of first major release (1.0.0)
