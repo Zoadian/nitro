@@ -1,19 +1,14 @@
-// Written in the D programming language.
-/**						   
-Copyright: Copyright Felix 'Zoadian' Hufnagel 2014-.
-
-License:   $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
-
-Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel)
+//###################################################################################################
+/**
+* Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
+* License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+* Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
 */
+//###################################################################################################
 
 module nitro.accessor;
 
-//---------------------------------------------------------------------------------------------------
-
-import std.typetuple;
-
-//---------------------------------------------------------------------------------------------------
+//###################################################################################################
 
 enum SoA;
 enum AoS;
@@ -119,6 +114,7 @@ struct Accessor(T) {
 		alias _ACCESSORS = staticMap!(AccessorOf, FTT);
 
 		static string _gen() @safe {
+			import std.typetuple : TypeTuple;
 			string ret;
 			foreach(i, F; FTT) {
 				enum IDX = (i > 0) ? TypeTuple!(staticMap!(RepresentationTypeTuple, FTT[0..i])).length : 0;
@@ -187,7 +183,8 @@ struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 	
 		void opOpAssign(string op : "~")(T t) @safe nothrow {
 
-			void fnAssign(size_t idx, X)(X x) @safe nothrow {		
+			void fnAssign(size_t idx, X)(X x) @safe nothrow {	
+				import std.typetuple : TypeTuple, staticMap;
 				foreach(i, F; FieldTypeTuple!X) {
 					enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
 					static if(FieldTypeTuple!F.length > 1) {
@@ -204,7 +201,8 @@ struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 
 		void insertInPlace(size_t pos, T t) @safe nothrow {
 
-			void fnAssign(size_t idx, X)(X x) @trusted nothrow {		
+			void fnAssign(size_t idx, X)(X x) @trusted nothrow {	
+				import std.typetuple : TypeTuple, staticMap;
 				import std.array : insertInPlace;
 				foreach(i, F; FieldTypeTuple!X) {
 					enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
@@ -241,3 +239,5 @@ struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
 	}
 
 }
+
+//###################################################################################################

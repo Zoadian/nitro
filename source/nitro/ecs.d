@@ -1,4 +1,15 @@
-﻿module nitro.ecs;
+﻿//###################################################################################################
+/**
+* Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
+* License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+* Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
+*/
+//###################################################################################################
+
+module nitro.ecs;
+
+//###################################################################################################
+
 import std.typetuple;
 import std.stdio;
 import std.algorithm;
@@ -6,6 +17,8 @@ import std.range;
 import std.traits;
 
 public import nitro.accessor;
+
+//###################################################################################################
 
 struct Entity {	
 private:
@@ -704,6 +717,8 @@ unittest {
     writeln("################## ECS UNITTEST STOP  ##################");
 }
 
+//###################################################################################################
+
 version(unittest) {
     static bool AoS_bCheckSystemOneConstructor = false;
     static bool AoS_bCheckSystemTwoConstructor = false;
@@ -967,3 +982,5 @@ unittest {
 
     writeln("################## AOS UNITTEST STOP  ##################");
 }
+
+//###################################################################################################

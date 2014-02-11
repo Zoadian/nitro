@@ -1,16 +1,19 @@
-// Written in the D programming language.
-/**						   
-Copyright: Copyright Felix 'Zoadian' Hufnagel 2014-.
-
-License:   $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
-
-Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel)
+//###################################################################################################
+/**
+* Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
+* License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+* Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
 */
+//###################################################################################################
+
 module nitro.gen.ecsgen;
 
-import nitro.ecs;
+//###################################################################################################
 
+import nitro.ecs;
 import std.typetuple;
+
+//###################################################################################################
 
 /**			   
 Component Flag. All Component must be annotated @Component
@@ -181,3 +184,5 @@ unittest {
 
     writeln("################## GEN.ECSGEN UNITTEST STOP  ##################");
 }
+
+//###################################################################################################
