@@ -9,7 +9,7 @@ Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel), $(WEB lvl3.org, Paul Fre
 
 module nitro.gen.querygen;
 
-import nitro.soa;
+import nitro.accessor;
 //---------------------------------------------------------------------------------------------------
 
 alias Qry = Accessor;
@@ -189,57 +189,57 @@ mixin template AutoQueryMapper(alias ECM) {
 version(unittest) {
 	import std.stdio;
     import nitro;
-    @Component struct ComponentOne { string message; }
-    @Component struct ComponentTwo { string message; }
-    @Component struct ComponentThree { string message; }
-    @Component struct ComponentFour { string message; }
+    @Component struct QUERYGEN_ComponentOne { string message; }
+    @Component struct QUERYGEN_ComponentTwo { string message; }
+    @Component struct QUERYGEN_ComponentThree { string message; }
+    @Component struct QUERYGEN_ComponentFour { string message; }
 
-    @Component struct ComponentFive { string message; }
-    @Component struct ComponentSix { string message; }
+    @Component struct QUERYGEN_ComponentFive { string message; }
+    @Component struct QUERYGEN_ComponentSix { string message; }
 
-    @System final class SystemOne(ECM) {
+    @System final class QUERYGEN_SystemOne(ECM) {
 
         void run(ECM ecm) {
             mixin AutoQueryMapper!ecm;
         }
 
-        void query1(Qry!ComponentOne c) {
+        void query1(Qry!QUERYGEN_ComponentOne c) {
             assert(c.message == "CheckSum: ");
             c.message ~= "VC;";
         }
 
-        void query2(ECM m, Qry!ComponentOne c) {
+        void query2(ECM m, Qry!QUERYGEN_ComponentOne c) {
             assert(c.message == "CheckSum: VC;");
             c.message ~= "VMC;";
         }
 
-        void query3(Entity e, Qry!ComponentOne c) {
+        void query3(Entity e, Qry!QUERYGEN_ComponentOne c) {
             assert(e == Entity(0));
             assert(c.message == "CheckSum: VC;VMC;");
             c.message ~= "VEC;";
         }
 
-        void query4(ECM m, Entity e, Qry!ComponentOne c) {
+        void query4(ECM m, Entity e, Qry!QUERYGEN_ComponentOne c) {
             assert(e == Entity(0));
             assert(c.message == "CheckSum: VC;VMC;VEC;");
             c.message ~= "VMEC;";
         }
 
-        void query5(Qry!ComponentThree c, Qry!ComponentFour c2) {
+        void query5(Qry!QUERYGEN_ComponentThree c, Qry!QUERYGEN_ComponentFour c2) {
             assert(c.message == "Check: ");
             assert(c2.message == "Sum: ");
             c.message ~= "VCC;";
             c2.message ~= "VCC;";
         }
 
-        void query6(ECM m, Qry!ComponentThree c, Qry!ComponentFour c2) {
+        void query6(ECM m, Qry!QUERYGEN_ComponentThree c, Qry!QUERYGEN_ComponentFour c2) {
             assert(c.message == "Check: VCC;");
             assert(c2.message == "Sum: VCC;");
             c.message ~= "VMCC;";
             c2.message ~= "VMCC;";
         }
 
-        void query7(Qry!ComponentFour c2, Entity e, Qry!ComponentThree c) {
+        void query7(Qry!QUERYGEN_ComponentFour c2, Entity e, Qry!QUERYGEN_ComponentThree c) {
             assert(e == Entity(2));
             assert(c.message == "Check: VCC;VMCC;");
             assert(c2.message == "Sum: VCC;VMCC;");
@@ -247,7 +247,7 @@ version(unittest) {
             c2.message ~= "VECC;";
         }
 
-        void query8(Qry!ComponentThree c, Entity e, Qry!ComponentFour c2, ECM m) {
+        void query8(Qry!QUERYGEN_ComponentThree c, Entity e, Qry!QUERYGEN_ComponentFour c2, ECM m) {
             assert(e == Entity(2));
             assert(c.message == "Check: VCC;VMCC;VECC;");
             assert(c2.message == "Sum: VCC;VMCC;VECC;");
@@ -256,17 +256,17 @@ version(unittest) {
         }
     }
 
-    @System final class SystemTwo(ECM) {
+    @System final class QUERYGEN_SystemTwo(ECM) {
 
         mixin AutoQuery;
 
-        bool query(Qry!ComponentOne c) {
+        bool query(Qry!QUERYGEN_ComponentOne c) {
             assert(c.message == "CheckSum: VC;VMC;VEC;VMEC;");
             c.message ~= "2VC;";
             return false;
         }
 
-        bool query(Qry!ComponentThree c, Qry!ComponentFour c2) {
+        bool query(Qry!QUERYGEN_ComponentThree c, Qry!QUERYGEN_ComponentFour c2) {
             assert(c.message == "Check: VCC;VMCC;VECC;VMECC;");
             assert(c2.message == "Sum: VCC;VMCC;VECC;VMECC;");
             c.message ~= "2VCC;";
@@ -274,12 +274,12 @@ version(unittest) {
             return false;
         }
 
-        bool query(Qry!ComponentTwo c) {
+        bool query(Qry!QUERYGEN_ComponentTwo c) {
             assert(c.message == "DeleteThis");
             return true;
         }
 
-        bool query(Qry!ComponentFive c, ComponentSix c2) {
+        bool query(Qry!QUERYGEN_ComponentFive c, QUERYGEN_ComponentSix c2) {
             assert(c.message == "Delete");
             assert(c2.message == "This");
             return true;
@@ -294,33 +294,33 @@ unittest {
 	// Test gen ecs functionality
 	mixin MakeECS!("autoECS", "nitro.gen.querygen");
 
-    Entity e = autoECS.ecm.pushEntity(ComponentOne("CheckSum: "));
+    Entity e = autoECS.ecm.pushEntity(QUERYGEN_ComponentOne("CheckSum: "));
 
     autoECS.run();
 
-    auto component = autoECS.ecm.getComponent!ComponentOne(e);
+    auto component = autoECS.ecm.getComponent!QUERYGEN_ComponentOne(e);
     assert(component.message == "CheckSum: VC;VMC;VEC;VMEC;2VC;");
 
     autoECS.ecm.deleteLater(e);
     autoECS.ecm.executeDelete();
 
-    Entity e2 = autoECS.ecm.pushEntity(ComponentTwo("DeleteThis"));
+    Entity e2 = autoECS.ecm.pushEntity(QUERYGEN_ComponentTwo("DeleteThis"));
 
     autoECS.run();
 
-    Entity e3 = autoECS.ecm.pushEntity(ComponentThree("Check: "), ComponentFour("Sum: "));
+    Entity e3 = autoECS.ecm.pushEntity(QUERYGEN_ComponentThree("Check: "), QUERYGEN_ComponentFour("Sum: "));
 
     autoECS.run();
 
-    auto componentThree = autoECS.ecm.getComponent!ComponentThree(e3);
-    auto componentFour = autoECS.ecm.getComponent!ComponentFour(e3);
+    auto componentThree = autoECS.ecm.getComponent!QUERYGEN_ComponentThree(e3);
+    auto componentFour = autoECS.ecm.getComponent!QUERYGEN_ComponentFour(e3);
     assert(componentThree.message == "Check: VCC;VMCC;VECC;VMECC;2VCC;");
     assert(componentFour.message == "Sum: VCC;VMCC;VECC;VMECC;2VCC;");
 
     autoECS.ecm.deleteLater(e3);
     autoECS.ecm.executeDelete();
 
-    Entity e4 = autoECS.ecm.pushEntity(ComponentFive("Delete"), ComponentSix("This"));
+    Entity e4 = autoECS.ecm.pushEntity(QUERYGEN_ComponentFive("Delete"), QUERYGEN_ComponentSix("This"));
 
     autoECS.run();
 
