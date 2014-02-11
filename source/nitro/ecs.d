@@ -20,32 +20,29 @@ private:
 	}
 }
 
-struct ComponentA {
-	string a;
-}
-
-struct ComponentB {
-	string b;
-}
-
-struct ComponentC {
-	string c;
-}
+enum hasFields(T) = RepresentationTypeTuple!T.length != 0;
 
 struct ComponentArray(COMPONENT) {
 	Entity[] entities;
-	SoAArray!COMPONENT components; //might be stored as SOA later
+	pragma(msg, "HASFIELD: " ,COMPONENT  ,  "  ", hasFields!COMPONENT);
+	static if(hasFields!COMPONENT) {
+		SoAArray!COMPONENT components;
+	}
 	
 	void add(Entity entity, COMPONENT component) @trusted nothrow {
 		try {
 			auto idx = countUntil!((a,b) => a > b)(this.entities, entity);
 			if(idx != -1) {
 				this.entities.insertInPlace(idx, entity);
-				this.components.insertInPlace(idx, component);
+				static if(hasFields!COMPONENT) {
+					this.components.insertInPlace(idx, component);
+				}
 			}
 			else {
 				this.entities ~= entity;
-				this.components ~= component;
+				static if(hasFields!COMPONENT) {
+					this.components ~= component;
+				}
 			}
 		}
 		catch(Exception e) {
@@ -58,7 +55,9 @@ struct ComponentArray(COMPONENT) {
 			if(idx != -1) {
 				this.entities = this.entities.remove!(SwapStrategy.stable)(idx);
 				//WARNING: this must be assigned to this.components if SOA is not used!
-				this.components.remove!(SwapStrategy.stable)(idx);
+				static if(hasFields!COMPONENT) {
+					this.components.remove!(SwapStrategy.stable)(idx);
+				}
 			}
 		}
 		catch(Exception e) {
@@ -75,19 +74,23 @@ struct ComponentArray(COMPONENT) {
 		}
 	}
 
-	Accessor!COMPONENT get(Entity entity) @trusted {
-		auto idx = this.entities.countUntil(entity);
-		if(idx == -1) {
-			throw new Exception("entity not found");
+	static if(hasFields!COMPONENT) {
+		Accessor!COMPONENT get(Entity entity) @trusted {
+			auto idx = this.entities.countUntil(entity);
+			if(idx == -1) {
+				throw new Exception("entity not found");
+			}
+			return this.components[idx];
 		}
-		return this.components[idx];
 	}
 	
 	invariant() {
 		// components must be ordered (ascending)!
 		assert(this.entities.dup.sort == this.entities);
 		// entity and component array must have same length!
-		assert(this.entities.length == this.components.length);
+		static if(hasFields!COMPONENT) {
+			assert(this.entities.length == this.components.length);
+		}
 	}
 }
 
@@ -323,6 +326,7 @@ public:
 	}
 	
 	Accessor!COMPONENT get(COMPONENT)() @safe nothrow {
+		static if(!hasFields!COMPONENT) { static assert(false, "Can not access " ~COMPONENT.stringof ~". It has no fields"); }
 		enum IDX_C = staticIndexOf!(COMPONENT, ECS.Components);
 		enum IDX_I = staticIndexOf!(COMPONENT, PCS);
 
@@ -516,10 +520,13 @@ version(unittest) {
         string FieldTwo;
         bool FieldThree;
     }
-
-    struct ComponentThree {
+	
+	struct ComponentThree {
 		int a;
-    }
+	}
+	
+	struct ComponentFour {
+	}
 }
 
 unittest {
@@ -528,7 +535,7 @@ unittest {
     writeln("################## ECS UNITTEST START ##################");
 
 	alias TEST_SYSTEMS = TypeTuple!(SystemOne, SystemTwo);
-	alias TEST_COMPONENTS = TypeTuple!(ComponentOne, ComponentTwo, ComponentThree);
+	alias TEST_COMPONENTS = TypeTuple!(ComponentOne, ComponentTwo, ComponentThree, ComponentFour);
 
 	alias TEST_ECM = EntityComponentManager!(TEST_COMPONENTS);
 	alias TEST_ECS = SystemManager!(TEST_ECM, TEST_SYSTEMS);
