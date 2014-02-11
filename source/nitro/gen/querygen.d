@@ -7,16 +7,6 @@ License:   $(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
 Authors:   $(WEB zoadian.de, Felix 'Zoadian' Hufnagel), $(WEB lvl3.org, Paul Freund)
 */
 
-/*
-
-	Todo:
-	* Cleanup code
-	* Make overloaded query functions work
-	* Test mixed arguments
-	* Update unittests to work and include mixed arguments/overloads/free function names
-
-*/
-
 module nitro.gen.querygen;
 
 import nitro.soa;
