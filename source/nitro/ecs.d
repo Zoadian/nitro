@@ -3,6 +3,7 @@ import std.typetuple;
 import std.stdio;
 import std.algorithm;
 import std.range;
+import std.traits;
 
 public import nitro.soa;
 
@@ -22,9 +23,16 @@ private:
 
 enum hasFields(T) = RepresentationTypeTuple!T.length != 0;
 
-struct ComponentArray(COMPONENT) {
+template hasFunctions(COMPONENT) {
+	private enum isFunction(string T) =  __traits(compiles, FunctionTypeOf!(__traits(getMember, COMPONENT, T))) ? true : false; 
+	private alias _isFns = staticMap!(isFunction, __traits(allMembers, COMPONENT));
+	private enum isTrue(alias T) = T == true;
+	enum hasFunctions = anySatisfy!(isTrue, _isFns);
+}
+
+struct ComponentArray(COMPONENT){
 	Entity[] entities;
-	pragma(msg, "HASFIELD: " ,COMPONENT  ,  "  ", hasFields!COMPONENT);
+	alias getMember(alias T) = typeof(__traits(getMember, COMPONENT, T)); 
 	static if(hasFields!COMPONENT) {
 		SoAArray!COMPONENT components;
 	}
@@ -91,8 +99,11 @@ struct ComponentArray(COMPONENT) {
 		static if(hasFields!COMPONENT) {
 			assert(this.entities.length == this.components.length);
 		}
+
+		static assert(!hasFunctions!COMPONENT, COMPONENT.stringof ~ " may not have memberfunctions!");
 	}
 }
+
 
 
 class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length == 0) {
@@ -115,6 +126,12 @@ class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
 	alias EntityArray(T) = Entity[];
 	staticMap!(ComponentArray, COMPONENTS) _components;
 	size_t _id = 0;
+
+	invariant() {
+		foreach(C; COMPONENTS) {
+			static assert(!hasFunctions!C, C.stringof ~ " may not have memberfunctions!");
+		}
+	}
 
 public:
 	Entity[] _deleteLaterntities;
