@@ -2,24 +2,71 @@
 
 An Entity Component System (ECS) for the D Programming Language.
 
-## Intro
+* Relationships are composed through data, similiar to relational databases.
+* Composition is accomplished by attatching Components to Entities.
+* Data is retrieved by querying for specific component combinations.
+* Program logic is separated from data and can be replaced with ease (loose coupling).
 
-Nitro implements a basic ECS architecture. Additional information is broadly available but often differs with implementation. Some sources are: [T-machine](http://t-machine.org/index.php/2007/09/03/entity-systems-are-the-future-of-mmog-development-part-1/), [Wikipedia](http://en.wikipedia.org/wiki/Entity_component_system) and [RichardLords blog](http://www.richardlord.net/blog/what-is-an-entity-framework). The following description may be specific to this implementation.
+Additional information on Entity Component Systems is broadly available but often differs in implementation. <br />
+See also:
+[T-machine](http://t-machine.org/index.php/2007/09/03/entity-systems-are-the-future-of-mmog-development-part-1/),
+[Wikipedia](http://en.wikipedia.org/wiki/Entity_component_system) and 
+[RichardLords blog](http://www.richardlord.net/blog/what-is-an-entity-framework).
 
-### Basic terminology
+## Terminology
 
-* Entities are unique identifiers (size_t). Components can be attached and removed at runtime.
-* Components are datasets(structs) that can be attached to entities and represent a single aspect of something (for example the health of a player).
-* A query returns a forward range to iterate over all entites with specified components (for example a query for all entities with player name and health) 
-* Systems encapsulate the execution logic that handles a specific aspect of the program (single purpose).
+#### Entitiy
+Entities is just unique identifiers. Components can be attached or detached at runtime.<br />
+`Entity e;`
 
-### Main characteristics
+#### Component
+Components are just data (structs without functions). They allow simple composition of objects, while avoiding class inheritance and virtual function performance penalties altogether.<br />
+`@Component struct PlayerComponent { string name; int health; int mana; } `<br />
+`@Component struct WeaponComponent { string name; int damage; } `
 
-* Relationships are composed through data, similiar to relational databases
-* Composition is accomplished by attatching components to entities
-* Data is retrieved by querying for specific component combinations (similiar to tagging)
-* Execution code is separated from data and can be replaced with ease (loose coupling)
-* Execution flow is defined by an ordered list of systems that each handle different aspects of the program.
+#### System
+Systems encapsulate the logic of specific aspects of the program. They are modular and can easily be extended, removed or replaced.<br /> 
+`@System class GravitySystem { void run() { /*...*/ } }`
+
+#### EntityComponentManager
+...<br />
+`auto ecs = new EntityComponentManager!(PlayerComponent, WeaponComponent)();`
+
+#### EntityComponentSystem
+...<br />
+
+#### Query
+Queries result in a QueryResults (forward ranges) containing all Entities with the requested Components.<br />
+`auto result = ecs.query!(PlayerComponent, WeaponComponent);`
+
+
+
+## Example 
+
+    @Component struct PlayerComponent {
+        string name; 
+        int health; 
+        int mana; 
+    } 
+    
+    @Component struct WeaponComponent {
+        string name; 
+        int damage; 
+    }
+    
+    @System class GravitySystem { 
+        void run() { 
+            /*...*/ 
+        } 
+    }
+    
+    auto ecs = /*.....*/
+    
+    for(;;) {
+        ecs.run();
+    }
+
+
 
 ## Usage
 
@@ -109,7 +156,6 @@ All parts of nitro are released under the [Boost software license - version 1.0]
 ## Todo
 
 * Finish readme
-* Support empty components
-* Add implementation notes to readme
-* Code cleanup
+* Think about "delay addComponent/removeComponent"
+* threadsafe
 * Release of first major release (1.0.0)
