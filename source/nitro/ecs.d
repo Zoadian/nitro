@@ -1,59 +1,49 @@
-﻿//###################################################################################################
-/**
-* Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
-* License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
-* Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
-*/
-//###################################################################################################
+﻿/***********************************************************************************************************************
+Implementation of an Entity Component System (ECS).
 
+Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
+License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
+*/
 module nitro.ecs;
 
-//###################################################################################################
-
-import std.typetuple;
-import std.stdio;
-import std.algorithm;
-import std.range;
-import std.traits;
-
 public import nitro.accessor;
+import std.traits : RepresentationTypeTuple;
 
-//###################################################################################################
+private enum hasFields(T) = RepresentationTypeTuple!T.length != 0;
 
-struct Entity {	
-private:
-	size_t id;
-	
-	int opCmp(ref const Entity entity) const @safe nothrow {
-		if(this.id < entity.id)
-			return -1;
-		else if(entity.id < this.id)
-			return 1;
-		
-		return 0;
-	}
-}
-
-enum hasFields(T) = RepresentationTypeTuple!T.length != 0;
-
-template hasFunctions(COMPONENT) {
-	private enum isFunction(string T) =  __traits(compiles, FunctionTypeOf!(__traits(getMember, COMPONENT, T))) ? true : false; 
-	private alias _isFns = staticMap!(isFunction, __traits(allMembers, COMPONENT));
-	private enum isTrue(alias T) = T == true;
+private template hasFunctions(COMPONENT) {
+	enum isFunction(string T) =  __traits(compiles, FunctionTypeOf!(__traits(getMember, COMPONENT, T))) ? true : false; 
+	import std.typetuple : staticMap, anySatisfy;
+	alias _isFns = staticMap!(isFunction, __traits(allMembers, COMPONENT));
+	enum isTrue(alias T) = T == true;
 	enum hasFunctions = anySatisfy!(isTrue, _isFns);
 }
 
-struct ComponentArray(COMPONENT){
+private alias Make_Size_t(T) = size_t;
+
+private template staticIota(size_t start, size_t stop)
+{
+	import std.typetuple : TypeTuple;
+	static if (stop <= start)
+		alias TypeTuple!() staticIota;
+	else
+		alias TypeTuple!(staticIota!(start, stop-1), stop-1) staticIota;
+}
+
+private struct ComponentArray(COMPONENT){
 	Entity[] entities;
 	alias getMember(alias T) = typeof(__traits(getMember, COMPONENT, T)); 
 	static if(hasFields!COMPONENT) {
-		SoAArray!COMPONENT components;
+		AccessorArray!COMPONENT components;
 	}
 	
 	void add(Entity entity, COMPONENT component) @trusted nothrow {
 		try {
+			import std.algorithm : countUntil;
 			auto idx = countUntil!((a,b) => a > b)(this.entities, entity);
 			if(idx != -1) {
+				import std.array : insertInPlace;
 				this.entities.insertInPlace(idx, entity);
 				static if(hasFields!COMPONENT) {
 					this.components.insertInPlace(idx, component);
@@ -72,8 +62,10 @@ struct ComponentArray(COMPONENT){
 	
 	void remove(Entity entity) @trusted nothrow {
 		try {
+			import std.algorithm : countUntil;
 			auto idx = this.entities.countUntil(entity);
 			if(idx != -1) {
+				import std.algorithm : remove, SwapStrategy;
 				this.entities = this.entities.remove!(SwapStrategy.stable)(idx);
 				//WARNING: this must be assigned to this.components if SOA is not used!
 				static if(hasFields!COMPONENT) {
@@ -87,6 +79,7 @@ struct ComponentArray(COMPONENT){
 	
 	bool has(Entity entity) const @trusted nothrow {
 		try {
+			import std.algorithm : countUntil;
 			auto idx = this.entities.countUntil(entity);
 			return idx != -1;
 		}
@@ -97,6 +90,7 @@ struct ComponentArray(COMPONENT){
 
 	static if(hasFields!COMPONENT) {
 		Accessor!COMPONENT get(Entity entity) @trusted {
+			import std.algorithm : countUntil;
 			auto idx = this.entities.countUntil(entity);
 			if(idx == -1) {
 				throw new Exception("entity not found");
@@ -117,9 +111,26 @@ struct ComponentArray(COMPONENT){
 	}
 }
 
+/***********************************************************************************************************************
+Entity
+*/
+struct Entity {	
+private:
+	size_t id;
 
+public:
+	///
+	int opCmp(ref const Entity entity) const @safe nothrow {
+		if(this.id < entity.id)
+			return -1;
+		else if(entity.id < this.id)
+			return 1;
+		
+		return 0;
+	}
+}
 
-class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length == 0) {
+final class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length == 0) {
 	alias Components = COMPONENTS;
 	Entity createEntity() @safe nothrow { assert(0); }
 	void deleteLater(Entity entity) @safe nothrow { assert(0); }
@@ -134,12 +145,19 @@ class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length == 0) {
 	void _destroyEntity(Entity entity) @safe nothrow { assert(0); }
 }
 
-class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
+/***********************************************************************************************************************
+EntityComponentManager
+*/
+final class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
 	alias Components = COMPONENTS;
 	alias EntityArray(T) = Entity[];
+	import std.typetuple : staticMap;
 	staticMap!(ComponentArray, COMPONENTS) _components;
-	size_t _id = 0;
+	size_t _nextEntityId = 0;
+	Entity[] _deleteLaterntities;
+	staticMap!(EntityArray, COMPONENTS) _deleteLaterComponents;
 
+	///
 	invariant() {
 		foreach(C; COMPONENTS) {
 			static assert(!hasFunctions!C, C.stringof ~ " may not have memberfunctions!");
@@ -147,26 +165,29 @@ class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
 	}
 
 public:
-	Entity[] _deleteLaterntities;
-	staticMap!(EntityArray, COMPONENTS) _deleteLaterComponents;
-		
+	///
 	Entity createEntity() @safe nothrow {
-		return Entity(_id++);
+		return Entity(_nextEntityId++);
 	}
-	
+
+	///
 	void deleteLater(Entity entity) @safe nothrow {
 		this._deleteLaterntities ~= entity;
 	}
-	
+
+	///
 	void deleteLater(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
 		foreach(i, PC; PCS) {
+			import std.typetuple : staticIndexOf;
 			enum IDX = staticIndexOf!(PC, COMPONENTS);
 			this._deleteLaterComponents[IDX] ~= entity;
 		}
 	}
-	
+
+	///
 	alias clearLater = deleteLater!COMPONENTS;
-	
+
+	///
 	void executeDelete() {
 		foreach(e; _deleteLaterntities) {
 			this._destroyEntity(e);
@@ -179,23 +200,28 @@ public:
 			_deleteLaterComponents[i].clear();
 		}		
 	}
-	
+
+	///
 	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) {
 		foreach(i, PC; PCS) {
+			import std.typetuple : staticIndexOf;
 			enum IDX = staticIndexOf!(PC, COMPONENTS);
 			this._components[IDX].add(entity, pcs[i]);
 		}
 	}
-	
+
+	///
 	void removeComponents(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
 		foreach(i, PC; PCS) {
 			enum IDX = staticIndexOf!(PC, COMPONENTS);
 			this._components[IDX].remove(entity);
 		}
 	}
-	
+
+	///
 	bool hasComponents(PCS...)(Entity entity) const @safe nothrow if(PCS.length > 0) {
 		foreach(i, PC; PCS) {
+			import std.typetuple : staticIndexOf;
 			enum IDX = staticIndexOf!(PC, COMPONENTS);
 			if(this._components[IDX].has(entity) == false) {
 				return false;
@@ -204,12 +230,15 @@ public:
 		return true;
 	}
 
+	///
 	Accessor!PC getComponent(PC)(Entity entity) @safe {
+		import std.typetuple : staticIndexOf;
 		enum IDX = staticIndexOf!(PC, COMPONENTS);
 		static assert(IDX != -1, "not fou");
 		return this._components[IDX].get(entity);
 	}
-	
+
+	///
 	QueryResult!(typeof(this), PCS) query(PCS...)() @safe nothrow if(PCS.length > 0) {
 		return QueryResult!(typeof(this), PCS)(this);
 	}
@@ -222,25 +251,19 @@ private:
 	}
 }
 
-private alias Make_Size_t(T) = size_t;
-
-
-template staticIota(size_t start, size_t stop)
-{
-	static if (stop <= start)
-		alias TypeTuple!() staticIota;
-	else
-		alias TypeTuple!(staticIota!(start, stop-1), stop-1) staticIota;
-}
-
-
 struct QueryResult(ECS, PCS...) if(PCS.length == 0) {
+private:
 	this(ECS ecs) @safe nothrow { assert(0); }
+
+public:
 	EntityResult!(ECS, PCS) front() @safe nothrow { assert(0); }
 	void popFront() @safe nothrow { assert(0); }
 	bool empty() const @safe nothrow { assert(0); }
 }
 
+/***********************************************************************************************************************
+QueryResult
+*/
 struct QueryResult(ECS, PCS...) if(PCS.length > 0 && PCS.length <= ECS.Components.length) {
 	ECS _ecs;
 	
@@ -251,21 +274,27 @@ struct QueryResult(ECS, PCS...) if(PCS.length > 0 && PCS.length <= ECS.Component
 		//assert(this._lookup.dup.sort == this._lookup);
 	}
 
-public:
+private:
 	this(ECS ecs) @safe nothrow {
 		this._ecs = ecs;
 		this._doLinearLookup();
 	}
-	
+
+public:
+	///
 	EntityResult!(ECS, PCS) front() @safe nothrow {
 		return _lookup[0];
 	}
-	
+
+	///
 	void popFront() @safe nothrow {
+		import std.range : popFront;
 		this._lookup.popFront();
 	}
-	
+
+	///
 	bool empty() const @safe nothrow {
+		import std.range : empty;
 		return this._lookup.empty;
 	}
 	
@@ -274,16 +303,19 @@ private:
 	// see http://codercareer.blogspot.de/2011/11/no-24-intersection-of-sorted-arrays.html
 	void _doLinearLookup() @trusted {
 		static if(PCS.length == 1) {
+			import std.typetuple : staticIndexOf;
 			enum IDX_C = staticIndexOf!(PCS, ECS.Components);
 			foreach(i, e; _ecs._components[IDX_C].entities) {
 				this._lookup ~= EntityResult!(ECS, PCS)(_ecs, i);
 			}
 		}
 		else {
+			import std.typetuple : staticMap;
 			staticMap!(Make_Size_t, PCS) indices;
 			
 			bool checkEnd() @safe nothrow {
 				foreach(i, P; PCS) {
+					import std.typetuple : staticIndexOf;
 					enum IDX_C = staticIndexOf!(P, ECS.Components);
 					if(indices[i] >=  this._ecs._components[IDX_C].entities.length) {
 						return false;
@@ -294,9 +326,10 @@ private:
 			
 			bool checkEqual() @safe nothrow {
 				foreach(i; staticIota!(1, PCS.length)) {
-					enum IDX_C_A = staticIndexOf!(PCS[0], ECS.Components);
-					enum IDX_C_B = staticIndexOf!(PCS[i], ECS.Components);
-					if(_ecs._components[IDX_C_A].entities[indices[0]] != _ecs._components[IDX_C_B].entities[indices[i]]) {
+					import std.typetuple : staticIndexOf;
+					enum IDX_CA = staticIndexOf!(PCS[0], ECS.Components);
+					enum IDX_CB = staticIndexOf!(PCS[i], ECS.Components);
+					if(_ecs._components[IDX_CA].entities[indices[0]] != _ecs._components[IDX_CB].entities[indices[i]]) {
 						return false;
 					}
 				}
@@ -314,9 +347,10 @@ private:
 					//increment index of lowest entity
 					size_t* pIdx = &indices[0];
 					foreach(i; staticIota!(1, PCS.length)) {
-						enum IDX_C_A = staticIndexOf!(PCS[i], ECS.Components);
-						enum IDX_C_B = staticIndexOf!(PCS[i -  1], ECS.Components);
-						if(_ecs._components[IDX_C_A].entities[indices[i]] < _ecs._components[IDX_C_B].entities[indices[i - 1]]) {
+						import std.typetuple : staticIndexOf;
+						enum IDX_CA = staticIndexOf!(PCS[i], ECS.Components);
+						enum IDX_CB = staticIndexOf!(PCS[i -  1], ECS.Components);
+						if(_ecs._components[IDX_CA].entities[indices[i]] < _ecs._components[IDX_CB].entities[indices[i - 1]]) {
 							pIdx = &indices[i];
 						}
 					}
@@ -327,25 +361,33 @@ private:
 	}
 }
 
-
+/***********************************************************************************************************************
+EntityResult dummy
+*/
 struct EntityResult(ECS, PCS...) if(PCS.length == 0) {
-	alias entity this;
+private:
 	this(IDX_TS...)(ECS ecs, IDX_TS indices) @safe nothrow { assert(0); }
+
+public:
+	alias entity this;
 	Accessor!COMPONENT get(COMPONENT)() @safe nothrow { assert(0); }
 	alias getComponent = get;
 	Entity entity() const @safe nothrow { assert(0); }
 	void deleteLater() @safe nothrow { assert(0); }
 }
 
+/***********************************************************************************************************************
+EntityResult
+*/
 struct EntityResult(ECS, PCS...) if(PCS.length > 0) {
 	enum is_size_t(T) = is(T == size_t);
 	
 	ECS _ecs;
+	import std.typetuple : staticMap;
 	staticMap!(Make_Size_t, PCS) _indices;
 
-public:
-	alias entity this;
-	
+private:
+	import std.typetuple : allSatisfy;
 	this(IDX_TS...)(ECS ecs, IDX_TS indices) @safe nothrow if(allSatisfy!(is_size_t, IDX_TS)) {
 		this._ecs = ecs;
 		
@@ -354,9 +396,17 @@ public:
 			this._indices[i] = indices[i];
 		}
 	}
-	
-	Accessor!COMPONENT get(COMPONENT)() @safe nothrow {
-		static if(!hasFields!COMPONENT) { static assert(false, "Can not access " ~COMPONENT.stringof ~". It has no fields"); }
+
+public:
+	///
+	alias entity this;
+
+	///
+	Accessor!COMPONENT getComponent(COMPONENT)() @safe nothrow {
+		static if(!hasFields!COMPONENT) { 
+			static assert(false, "Can not access " ~COMPONENT.stringof ~". It has no fields"); 
+		}
+		import std.typetuple : staticIndexOf;
 		enum IDX_C = staticIndexOf!(COMPONENT, ECS.Components);
 		enum IDX_I = staticIndexOf!(COMPONENT, PCS);
 
@@ -367,29 +417,29 @@ public:
 			static assert(false, "no such component: " ~ COMPONENT.stringof ~ ". Available are: " ~ PCS.stringof);
 		}
 	}
-	
-	alias getComponent = get;
-	
+
+	///
 	Entity entity() const @safe nothrow {
+		import std.typetuple : staticIndexOf;
 		enum IDX = staticIndexOf!(PCS[0], ECS.Components);
 		return this._ecs._components[IDX].entities[_indices[0]];
 	}
-	
+
+	///
 	void deleteLater() @safe nothrow {
 		this._ecs.deleteLater(entity);
 	}
 }
 
-
-
-/****************************************************************
+/***********************************************************************************************************************
+SystemManager
 */
-class SystemManager(ECM, ALL_SYSTEMS...) {
+final class SystemManager(ECM, ALL_SYSTEMS...) {
 private:
 	template TEMPLATEIZE_SYSTEM(alias T) {
 		alias TEMPLATEIZE_SYSTEM = T!ECM;
 	}
-	
+	import std.typetuple : staticMap;
 	alias SYSTEMS = staticMap!(TEMPLATEIZE_SYSTEM, ALL_SYSTEMS);
 	
 private:
@@ -397,8 +447,7 @@ private:
 	SYSTEMS _systems;
 	
 public:
-	/************************************************************
-	*/
+	///
 	this() {
 		foreach(s, S; SYSTEMS) {
 
@@ -418,16 +467,15 @@ public:
 		}
 	}
 
-	/************************************************************
-	*/
+	///
 	~this() {
 		foreach(s, S; SYSTEMS) {
 			_systems[s].destroy();
 		}
 	}
 
-	/************************************************************
-	Runs all systems once.
+	/**
+	Runs all systems in order of ALL_SYSTEMS
 	*/
 	void run() {
 		foreach(s; _systems) {
@@ -435,25 +483,32 @@ public:
 		}
 	}
 
-	/************************************************************
+	/**
+	Get the EntityComponentManager from this SystemManager
 	*/
 	@property ECM ecm() {
 		return _ecm;
 	}
 
-	/************************************************************
+	/**
 	Returns requested system.
 	*/	
 	auto system(alias S)() @safe nothrow {		
 		enum StringOf(T) = T.stringof;
+		import std.typetuple : staticIndexOf;
 		alias IDX = staticIndexOf!(StringOf!(S!ECM), staticMap!(StringOf, SYSTEMS));
 		static assert(IDX != -1, S!ECM.stringof ~ " is not part of " ~ SYSTEMS.stringof);
 		return _systems[IDX];
 	}
 }
 
-//###################################################################################################
 
+
+
+
+
+
+//###################################################################################################
 version(unittest) {
     static bool bCheckSystemOneConstructor = false;
     static bool bCheckSystemTwoConstructor = false;
@@ -462,10 +517,10 @@ version(unittest) {
     static int runCountSystemTwo = 0;
 
     final class SystemOne(ECM) {
-        string _identifier;
+        string _nextEntityIdentifier;
 
         this() {
-            _identifier = "SystemOne";
+            _nextEntityIdentifier = "SystemOne";
             bCheckSystemOneConstructor = true;
         }
 
@@ -497,10 +552,10 @@ version(unittest) {
 
     final class SystemTwo(ECM) {
         ECM _ecm;
-        string _identifier;
+        string _nextEntityIdentifier;
 
         this(ECM ecm) {
-            _identifier = "SystemTwo";
+            _nextEntityIdentifier = "SystemTwo";
             _ecm = ecm;
             bCheckSystemTwoConstructor = true;
         }
@@ -567,8 +622,8 @@ unittest {
 	auto system_one = test_ecs.system!SystemOne();
 	auto system_two = test_ecs.system!SystemTwo();
 
-    assert(system_one._identifier == "SystemOne");
-    assert(system_two._identifier == "SystemTwo");
+    assert(system_one._nextEntityIdentifier == "SystemOne");
+    assert(system_two._nextEntityIdentifier == "SystemTwo");
 
     assert(runCountSystemOne == 0);
     assert(runCountSystemTwo == 0);
@@ -727,10 +782,10 @@ version(unittest) {
     static int AoS_runCountSystemTwo = 0;
 
     final class AoS_SystemOne(ECM) {
-        string _identifier;
+        string _nextEntityIdentifier;
 
         this() {
-            _identifier = "SystemOne";
+            _nextEntityIdentifier = "SystemOne";
             AoS_bCheckSystemOneConstructor = true;
         }
 
@@ -762,10 +817,10 @@ version(unittest) {
 
     final class AoS_SystemTwo(ECM) {
         ECM _ecm;
-        string _identifier;
+        string _nextEntityIdentifier;
 
         this(ECM ecm) {
-            _identifier = "SystemTwo";
+            _nextEntityIdentifier = "SystemTwo";
             _ecm = ecm;
             AoS_bCheckSystemTwoConstructor = true;
         }
@@ -833,8 +888,8 @@ unittest {
 	auto system_one = test_ecs.system!AoS_SystemOne();
 	auto system_two = test_ecs.system!AoS_SystemTwo();
 
-    assert(system_one._identifier == "SystemOne");
-    assert(system_two._identifier == "SystemTwo");
+    assert(system_one._nextEntityIdentifier == "SystemOne");
+    assert(system_two._nextEntityIdentifier == "SystemTwo");
 
     assert(AoS_runCountSystemOne == 0);
     assert(AoS_runCountSystemTwo == 0);

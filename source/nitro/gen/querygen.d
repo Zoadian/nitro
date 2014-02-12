@@ -1,31 +1,23 @@
-//###################################################################################################
-/**
-* Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
-* License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
-* Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
+/***********************************************************************************************************************
+Automatically generate queries based on functions in Systems
+This Module is optional and not using it is (currently) preferred.
+
+Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
+License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
 */
-//###################################################################################################
-
 module nitro.gen.querygen;
-
-//###################################################################################################
 
 import nitro.accessor;
 
-//###################################################################################################
-
-alias Qry = Accessor;
-
-//---------------------------------------------------------------------------------------------------
-
-template TemplateInfo( T ) {
+private template TemplateInfo( T ) {
 	static if ( is( T t == U!V, alias U, V... ) ) {
 		alias U Template;
 		alias V Arguments;
 	}
 }
 
-template MemberFunctions(T) {
+private template MemberFunctions(T) {
 	import std.typetuple : staticMap; 
 	template ToFunctionType(string functionName) {
 		import std.traits : MemberFunctionsTuple;
@@ -34,9 +26,7 @@ template MemberFunctions(T) {
 	alias MemberFunctions = staticMap!(ToFunctionType, __traits(allMembers, T));
 }
 
-//---------------------------------------------------------------------------------------------------
-
-auto pushEntity(ECM, ARGS...)(ECM ecm, ARGS args) {
+private auto pushEntity(ECM, ARGS...)(ECM ecm, ARGS args) {
 	auto e = ecm.createEntity();
 	foreach(arg;args) {
         ecm.addComponents(e, arg);
@@ -44,14 +34,21 @@ auto pushEntity(ECM, ARGS...)(ECM ecm, ARGS args) {
     return e;
 }
 
-//---------------------------------------------------------------------------------------------------
+///
+alias Qry = Accessor;
+
+/***********************************************************************************************************************
+AutoQuery
+*/
 mixin template AutoQuery() {
 	void run(ECM)(ECM ecm) {
 		mixin AutoQueryMapper!(ecm);
 	}
 }
 
-//---------------------------------------------------------------------------------------------------
+/***********************************************************************************************************************
+AutoQueryMapper
+*/
 mixin template AutoQueryMapper(alias ECM) {
 
 	//import std.typetuple : TypeTuple, EraseAll, staticMap, allSatisfy, anySatisfy; 
@@ -294,7 +291,7 @@ unittest {
     writeln("################## GEN.QUERYGEN UNITTEST START ##################");
 
 	// Test gen ecs functionality
-	mixin MakeECS!("autoECS", "nitro.gen.querygen");
+	auto autoECS = makeECS!(nitro.gen.querygen)();
 
     Entity e = autoECS.ecm.pushEntity(QUERYGEN_ComponentOne("CheckSum: "));
 
@@ -328,5 +325,3 @@ unittest {
 
     writeln("################## GEN.QUERYGEN UNITTEST STOP  ##################");
 }
-
-//###################################################################################################

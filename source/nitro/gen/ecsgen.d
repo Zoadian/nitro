@@ -1,118 +1,79 @@
-//###################################################################################################
-/**
-* Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
-* License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
-* Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
-*/
-//###################################################################################################
+/***********************************************************************************************************************
+Implementation of an 'Array of Structures' and 'Structure of Arrays' Array
 
+Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
+License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
+*/
 module nitro.gen.ecsgen;
 
-//###################################################################################################
-
 import nitro.ecs;
-import std.typetuple;
 
-//###################################################################################################
+import std.traits : fullyQualifiedName;
+private enum isModule(alias T) = __traits(compiles, mixin("import " ~ fullyQualifiedName!T ~ ";"));
 
-/**			   
-Component Flag. All Component must be annotated @Component
-*/
+///Component Flag. All Component must be annotated @Component
 enum Component;	  
 
-/**
-System Flag. All Systems must be annotated @System
-*/
+///System Flag. All Systems must be annotated @System
 enum System;
 
-/**
-ModuleLookup
+/***********************************************************************************************************************
+ComponentsOfModule
 */
-mixin template ComponentSystemLookup() {
-	/**
-	ComponentsOfModule
-	*/
-	template ComponentsOfModule(alias M) {
-		template TYPE(string MEMBER_NAME) {
-			static if(__traits(compiles, __traits(getMember, M, MEMBER_NAME)())) {
-				alias TYPE = typeof(__traits(getMember, M, MEMBER_NAME)());
-			}	
-			else {
-				alias TYPE = void;
-			}
+template ComponentsOfModule(alias MODULE) {	
+	mixin("import " ~ fullyQualifiedName!MODULE ~ ";");
+	template TYPE(string MEMBER_NAME) {
+		static if(__traits(compiles, __traits(getMember, MODULE, MEMBER_NAME)())) {
+			alias TYPE = typeof(__traits(getMember, MODULE, MEMBER_NAME)());
 		}	
-		template isComponent(alias T) { enum isComponent = staticIndexOf!(Component, __traits(getAttributes, T)) != -1; };	  
-		alias ComponentsOfModule = NoDuplicates!(Filter!(isComponent, EraseAll!(void, staticMap!(TYPE, __traits(allMembers, M)))));		  
-		//pragma(msg, ComponentsOfModule ,M.stringof);
-	}			
-
-
-	/**
-	SystemsOfModule
-	*/
-	template SystemsOfModule(alias M) {		
-		template TYPE(string MEMBER_NAME) {
-			// Temporary solution (hack)
-			static if(__traits(compiles, __traits(getMember, M, MEMBER_NAME).stringof)) {
-				enum MEMBER_DEFINITION = __traits(getMember, M, MEMBER_NAME).stringof;
-				import std.algorithm : startsWith, endsWith;
-				static if(MEMBER_DEFINITION.startsWith("class ") && MEMBER_DEFINITION.endsWith("(ECM)"))
-					mixin("alias TYPE ="~ MEMBER_NAME ~"!(EntityComponentManager!());");
-				else 
-					alias TYPE = void;
-			}
-			else {
-				alias TYPE = void;
-			}
-		}	
-		template isSystem(alias T) { enum isSystem = staticIndexOf!(System, __traits(getAttributes, T)) != -1; };	  
-		alias SystemsOfModule = NoDuplicates!(Filter!(isSystem, EraseAll!(void, staticMap!(TYPE, __traits(allMembers, M)))));  
-		//pragma(msg, SystemsOfModule);
-	}			
-
-
-}
-
-
-/**
-MakeECS
-*/
-mixin template MakeECS(string SYMBOL_NAME, string MODULE_LIST) {					
-
-	mixin ComponentSystemLookup;
-	string c(string s...) {
-		import std.algorithm : splitter;
-		auto e = s.splitter(","); 
-		//gen imports
-		string res = "import std.typetuple; import ";	
-		foreach(k; e) {
-			res ~= k ~",";
-		}		   
-		res.length -= 1;
-		res ~= ";\n";		
-		//gen components
-		res ~= "alias Components = TypeTuple!(";
-		foreach(k; e) {						
-			res ~= "ComponentsOfModule!(" ~ k ~"),";
-		}		 
-		res.length -= 1;
-		res ~= ");\n";
-		//gen systems 
-		res ~= "alias Systems = TypeTuple!(";
-		foreach(k; e) {
-			res ~= "SystemsOfModule!(" ~ k ~"),";
+		else {
+			alias TYPE = void;
 		}
-		res.length -= 1;
-		res ~= ");\n";
+	}	
+	import std.typetuple : NoDuplicates, Filter, EraseAll, staticMap, staticIndexOf;
+	template isComponent(alias T) { enum isComponent = staticIndexOf!(Component, __traits(getAttributes, T)) != -1; };	  
+	alias ComponentsOfModule = NoDuplicates!(Filter!(isComponent, EraseAll!(void, staticMap!(TYPE, __traits(allMembers, MODULE)))));
+}	
 
-		return res;
-	}
-	//pragma(msg, c(MODULE_LIST));
-	mixin(c(MODULE_LIST));
-
-	alias ECS = SystemManager!(EntityComponentManager!Components, Systems);
-	mixin("ECS " ~ SYMBOL_NAME ~ " = new ECS();");
+/***********************************************************************************************************************
+SystemsOfModule
+*/
+template SystemsOfModule(alias MODULE) {		
+	mixin("import " ~ fullyQualifiedName!MODULE ~ ";");
+	template TYPE(string MEMBER_NAME) {
+		// Temporary solution
+		static if(__traits(compiles, __traits(getMember, MODULE, MEMBER_NAME).stringof)) {
+			enum MEMBER_DEFINITION = __traits(getMember, MODULE, MEMBER_NAME).stringof;
+			import std.algorithm : startsWith, endsWith;
+			static if(MEMBER_DEFINITION.startsWith("class ") && MEMBER_DEFINITION.endsWith("(ECM)"))
+				mixin("alias TYPE ="~ MEMBER_NAME ~"!(EntityComponentManager!());");
+			else 
+				alias TYPE = void;
+		}
+		else {
+			alias TYPE = void;
+		}
+	}	
+	import std.typetuple : NoDuplicates, Filter, EraseAll, staticMap, staticIndexOf;
+	template isSystem(alias T) { enum isSystem = staticIndexOf!(System, __traits(getAttributes, T)) != -1; };	
+	alias SystemsOfModule = NoDuplicates!(Filter!(isSystem, EraseAll!(void, staticMap!(TYPE, __traits(allMembers, MODULE)))));  
 }
+
+/***********************************************************************************************************************
+makeECS generates an ECS from Components and Systems found in modules MODULE_LIST
+*/
+auto makeECS(MODULE_LIST...)() {				
+	import std.typetuple : TypeTuple, staticMap;	
+
+	//static assert(allSatisfy!(isModule, MODULE_LIST), "passed a non-module");
+	
+	alias COMPONENTS = TypeTuple!(staticMap!(ComponentsOfModule, MODULE_LIST));
+	alias SYSTEMS = TypeTuple!(staticMap!(SystemsOfModule, MODULE_LIST));
+
+	return new SystemManager!(EntityComponentManager!COMPONENTS, SYSTEMS)();
+}
+
 
 //###################################################################################################
 
@@ -167,7 +128,7 @@ unittest {
     writeln("################## GEN.ECSGEN UNITTEST START ##################");
 
 	// Test gen ecs functionality
-	mixin MakeECS!("autoECS", "nitro.gen.ecsgen");
+	auto autoECS = makeECS!(nitro.gen.ecsgen, nitro.gen.querygen)();
 
 	Entity entity = autoECS.ecm.createEntity();
     autoECS.ecm.addComponents(entity, ECSGEN_ComponentOne("CheckpointOne"));
@@ -184,5 +145,3 @@ unittest {
 
     writeln("################## GEN.ECSGEN UNITTEST STOP  ##################");
 }
-
-//###################################################################################################

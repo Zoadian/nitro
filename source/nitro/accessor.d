@@ -1,19 +1,22 @@
-//###################################################################################################
-/**
-* Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
-* License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
-* Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
-*/
-//###################################################################################################
+/***********************************************************************************************************************
+Implementation of an 'Array of Structures' and 'Structure of Arrays' Array
 
+Copyright: Copyright Felix 'Zoadian' Hufnagel 2014- and Paul Freund 2014-.
+License: a$(WEB boost.org/LICENSE_1_0.txt, Boost License 1.0).
+Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Freund).
+*/
 module nitro.accessor;
 
-//###################################################################################################
+public import std.algorithm : SwapStrategy;
+import std.traits : FieldTypeTuple;
 
+///
 enum SoA;
+
+///
 enum AoS;
 
-template isAoS(T) {
+private template isAoS(T) {
 	import std.typetuple : staticMap, anySatisfy;
 	enum isAoSAttribute(T) = is(T == AoS);
 	static if(__traits(compiles, __traits(getAttributes, T)))
@@ -22,18 +25,16 @@ template isAoS(T) {
 		enum isAoS = false;
 }
 
-//---------------------------------------------------------------------------------------------------
+private alias ToDynamicArray(T) = T[];	
 
-private alias _ToDynamicArray(T) = T[];	
-
-/**
+/***********************************************************************************************************************
 A TypeTuple containing all fields (recursive!) of type T as dynamic Array. 
 */
 template ToSoA(T) {
 	import std.traits : RepresentationTypeTuple;
 	import std.typetuple : staticMap;
 	alias _FIELDS = RepresentationTypeTuple!T;	
-	alias ToSoA = staticMap!(_ToDynamicArray, _FIELDS);
+	alias ToSoA = staticMap!(ToDynamicArray, _FIELDS);
 }
 unittest {
     import std.stdio : writeln; 
@@ -49,195 +50,195 @@ unittest {
     writeln("################## SOA UNITTEST STOP  ##################");
 }
 
+/***********************************************************************************************************************
+'Array of Structures' Array Accessor mimics all fields of type T
+*/
+struct Accessor(T) if(isAoS!(T)) {
+private:
+	T* _data;
 
-
-
-
-struct Accessor(T) {
-
-	// Use AoS
-	static if(isAoS!(T)) {
-		T* _data;
-
-		this(ref T t) @trusted nothrow {
-			_data = &t;
-		}
-
-		alias FTT = FieldTypeTuple!T;
-		static string _gen() @safe {
-			string ret;
-			foreach(i, F; FTT) {
-				enum fn_ret_str = F.stringof;
-				enum fn_name_str = T.tupleof[i].stringof;
-				ret ~= "@property ref " ~ fn_ret_str ~ " " ~ fn_name_str ~ "(){ return _data." ~ fn_name_str ~ "; }\n";
-			}
-			return ret;
-		}
-
-		//pragma(msg, "GEN: ", _gen());
-		mixin(_gen());
+	this(ref T t) @trusted nothrow {
+		_data = &t;
 	}
 
-	// Use SoA
-	else {
-		import std.traits : RepresentationTypeTuple, FieldTypeTuple, fullyQualifiedName, moduleName, isPointer;
-		import std.typetuple : staticMap;
-		import std.conv;
-		private alias _ToPointer(T) = T*;	
-		alias SOA_PTRS = staticMap!(_ToPointer, ToSoA!T);
-		SOA_PTRS _pData;
-		size_t _idx;
-		
-		this(K...)(size_t idx, ref K k) @trusted nothrow {
-			_idx = idx;
-			foreach(i, P; K) {
-				static if(isPointer!(P)) {
-					_pData[i] = k[i];
-				}
-				else {
-					_pData[i] = &k[i];
-				}
-			}
+	alias FTT = FieldTypeTuple!T;
+	static string _gen() @safe {
+		string ret;
+		foreach(i, F; FTT) {
+			enum fn_ret_str = F.stringof;
+			enum fn_name_str = T.tupleof[i].stringof;
+			ret ~= "@property ref " ~ fn_ret_str ~ " " ~ fn_name_str ~ "(){ return _data." ~ fn_name_str ~ "; }\n";
 		}
+		return ret;
+	}
 
-		alias FTT = FieldTypeTuple!T;
+public:
+	mixin(_gen());
+}
 
-		template AccessorOf(T) {
-			static if(FieldTypeTuple!(T).length > 1) {
-				alias AccessorOf = Accessor!T;
+/***********************************************************************************************************************
+'Structure of Arrays' Array Accessor mimics all fields of type T
+*/
+struct Accessor(T) if(!isAoS!(T)) {
+private:
+	import std.traits : RepresentationTypeTuple, FieldTypeTuple, fullyQualifiedName, moduleName, isPointer;
+	import std.typetuple : staticMap;
+	import std.conv;
+	private alias _ToPointer(T) = T*;	
+	alias SOA_PTRS = staticMap!(_ToPointer, ToSoA!T);
+	SOA_PTRS _pData;
+	size_t _idx;
+	
+	this(K...)(size_t idx, ref K k) @trusted nothrow {
+		_idx = idx;
+		foreach(i, P; K) {
+			static if(isPointer!(P)) {
+				_pData[i] = k[i];
 			}
 			else {
-				alias AccessorOf = T;
+				_pData[i] = &k[i];
 			}
 		}
+	}
 
-		alias _ACCESSORS = staticMap!(AccessorOf, FTT);
+	alias FTT = FieldTypeTuple!T;
 
-		static string _gen() @safe {
-			import std.typetuple : TypeTuple;
-			string ret;
-			foreach(i, F; FTT) {
-				enum IDX = (i > 0) ? TypeTuple!(staticMap!(RepresentationTypeTuple, FTT[0..i])).length : 0;
-				enum idx_str = to!string(IDX);
+	template AccessorOf(T) {
+		static if(FieldTypeTuple!(T).length > 1) {
+			alias AccessorOf = Accessor!T;
+		}
+		else {
+			alias AccessorOf = T;
+		}
+	}
 
-				enum fn_ret_str = " _ACCESSORS[" ~ to!string(i) ~ "] ";
-				enum fn_name_str = T.tupleof[i].stringof;
+	alias _ACCESSORS = staticMap!(AccessorOf, FTT);
 
+	static string _gen() @safe {
+		import std.typetuple : TypeTuple;
+		string ret;
+		foreach(i, F; FTT) {
+			enum IDX = (i > 0) ? TypeTuple!(staticMap!(RepresentationTypeTuple, FTT[0..i])).length : 0;
+			enum idx_str = to!string(IDX);
+
+			enum fn_ret_str = " _ACCESSORS[" ~ to!string(i) ~ "] ";
+			enum fn_name_str = T.tupleof[i].stringof;
+
+			static if(FieldTypeTuple!F.length > 1) {
+				ret ~= "@property" ~ fn_ret_str ~ fn_name_str ~ "(){ return " ~ fn_ret_str ~ "(_idx, _pData[" ~ to!string(IDX) ~ ".." ~ to!string(IDX + RepresentationTypeTuple!F.length) ~ "]); };\n";
+			}
+			else {
+				ret ~= "@property ref" ~ fn_ret_str ~ fn_name_str ~ "(){ return (*_pData[" ~ to!string(IDX) ~ "])[_idx]; }\n";
+			}
+		}
+		return ret;
+	}
+
+public:
+	mixin(_gen());
+}
+
+/***********************************************************************************************************************
+Implements an 'Array of Structures' Array
+*/
+struct AccessorArray(T) if(isAoS!(T) && FieldTypeTuple!T.length > 0) {
+private:
+	ToDynamicArray!(T) _data;
+
+public:
+	///
+	void opOpAssign(string op : "~")(T t) @safe nothrow {
+		_data ~= t;
+	}
+
+	public import std.algorithm : SwapStrategy;
+	///
+	void remove(SwapStrategy swapStrategy = SwapStrategy.stable)(size_t idx) {
+		import std.algorithm : remove;
+		_data = remove!swapStrategy(_data, idx);
+	}
+
+	///
+	void insertInPlace(size_t pos, T t) nothrow {
+		import std.array : insertInPlace;
+		_data.insertInPlace(pos, t);
+	}
+
+	///
+	size_t length() const @safe nothrow {
+		return _data.length;
+	}
+
+	///
+	Accessor!(T) opIndex(size_t idx) @safe nothrow {
+		return Accessor!(T)(_data[idx]);
+	}
+}
+
+/***********************************************************************************************************************
+Implements an 'Structure of Arrays' Array
+*/
+struct AccessorArray(T) if(!isAoS!(T) && FieldTypeTuple!T.length > 0) {
+private:
+	ToSoA!T _data;
+
+public:
+	///
+	void opOpAssign(string op : "~")(T t) @safe nothrow {
+
+		void fnAssign(size_t idx, X)(X x) @safe nothrow {	
+			foreach(i, F; FieldTypeTuple!X) {
+				import std.typetuple : TypeTuple, staticMap;
+				import std.traits : RepresentationTypeTuple;
+				enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
 				static if(FieldTypeTuple!F.length > 1) {
-					ret ~= "@property" ~ fn_ret_str ~ fn_name_str ~ "(){ return " ~ fn_ret_str ~ "(_idx, _pData[" ~ to!string(IDX) ~ ".." ~ to!string(IDX + RepresentationTypeTuple!F.length) ~ "]); };\n";
+					fnAssign!(IDX)(x.tupleof[i]);
 				}
 				else {
-					ret ~= "@property ref" ~ fn_ret_str ~ fn_name_str ~ "(){ return (*_pData[" ~ to!string(IDX) ~ "])[_idx]; }\n";
+					this._data[IDX] ~= x.tupleof[i];
 				}
 			}
-			return ret;
 		}
-	
-		mixin(_gen());
+
+		fnAssign!(0)(t);
 	}
-}
 
+	///
+	void insertInPlace(size_t pos, T t) @safe nothrow {
 
-
-
-import std.array : back;
-import std.traits : RepresentationTypeTuple, FieldTypeTuple;
-
-
-
-/**
-Implements an 'Structure of Arrays' Array.
-*/
-struct SoAArray(T) if(FieldTypeTuple!T.length > 0) {
-
-	// Use AoS
-	static if(isAoS!(T)) {
-		_ToDynamicArray!(T) _data;
-
-		void opOpAssign(string op : "~")(T t) @safe nothrow {
-			_data ~= t;
+		void fnAssign(size_t idx, X)(X x) @trusted nothrow {	
+			foreach(i, F; FieldTypeTuple!X) {
+				import std.typetuple : TypeTuple, staticMap;
+				import std.traits : RepresentationTypeTuple;
+				enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
+				static if(FieldTypeTuple!F.length > 1) {
+					fnAssign!(IDX)(x.tupleof[i]);
+				}
+				else {
+					import std.array : insertInPlace;
+					this._data[IDX].insertInPlace(pos, x.tupleof[i]);
+				}
+			}
 		}
 
-		public import std.algorithm : SwapStrategy;
-		void remove(SwapStrategy swapStrategy = SwapStrategy.stable)(size_t idx) {
+		fnAssign!(0)(t);
+	}
+
+	///
+	void remove(SwapStrategy swapStrategy = SwapStrategy.stable)(size_t idx) @safe {
+		foreach(i, Field; ToSoA!T) {
 			import std.algorithm : remove;
-			_data = remove!swapStrategy(_data, idx);
-		}
-
-		void insertInPlace(size_t pos, T t) nothrow {
-			import std.array : insertInPlace;
-			_data.insertInPlace(pos, t);
-		}
-
-		size_t length() const @safe nothrow {
-			return _data.length;
-		}
-
-		Accessor!(T) opIndex(size_t idx) @safe nothrow {
-			return Accessor!(T)(_data[idx]);
+			_data[i] = remove!swapStrategy(_data[i], idx);
 		}
 	}
-	// Use SoA
-	else {
-		ToSoA!T _data;
-	
-		void opOpAssign(string op : "~")(T t) @safe nothrow {
 
-			void fnAssign(size_t idx, X)(X x) @safe nothrow {	
-				import std.typetuple : TypeTuple, staticMap;
-				foreach(i, F; FieldTypeTuple!X) {
-					enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
-					static if(FieldTypeTuple!F.length > 1) {
-						fnAssign!(IDX)(x.tupleof[i]);
-					}
-					else {
-						this._data[IDX] ~= x.tupleof[i];
-					}
-				}
-			}
-
-			fnAssign!(0)(t);
-		}
-
-		void insertInPlace(size_t pos, T t) @safe nothrow {
-
-			void fnAssign(size_t idx, X)(X x) @trusted nothrow {	
-				import std.typetuple : TypeTuple, staticMap;
-				import std.array : insertInPlace;
-				foreach(i, F; FieldTypeTuple!X) {
-					enum IDX = (i > 0) ? idx + TypeTuple!(staticMap!(RepresentationTypeTuple, FieldTypeTuple!X[0..i])).length : idx;
-					static if(FieldTypeTuple!F.length > 1) {
-						fnAssign!(IDX)(x.tupleof[i]);
-					}
-					else {
-						import std.array : insertInPlace;
-						this._data[IDX].insertInPlace(pos, x.tupleof[i]);
-					}
-				}
-			}
-
-			fnAssign!(0)(t);
-		}
-
-		public import std.algorithm : SwapStrategy;
-		void remove(SwapStrategy swapStrategy = SwapStrategy.stable)(size_t idx) @safe {
-			foreach(i, Field; ToSoA!T) {
-				import std.algorithm : remove;
-				_data[i] = remove!swapStrategy(_data[i], idx);
-			}
-		}
-	
-		size_t length() const @safe nothrow {
-			return _data[0].length;
-		}
-	
-	
-		Accessor!(T) opIndex(size_t idx) @safe nothrow {
-			return Accessor!(T)(idx, _data);
-		}
-
+	///
+	size_t length() const @safe nothrow {
+		return _data[0].length;
 	}
 
+	///
+	Accessor!(T) opIndex(size_t idx) @safe nothrow {
+		return Accessor!(T)(idx, _data);
+	}
 }
-
-//###################################################################################################
