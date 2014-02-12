@@ -21,19 +21,22 @@ Entities is just unique identifiers. Components can be attached or detached at r
 
 #### Component
 Components are just data (structs without functions). They allow simple composition of objects, while avoiding class inheritance and virtual function performance penalties altogether.<br />
-`@Component struct PlayerComponent { string name; int health; int mana; } `<br />
-`@Component struct WeaponComponent { string name; int damage; } `
+`@Component struct PlayerComponent { string name; int x; int y; int z; } `<br />
+`@Component struct MovementComponent { int x; int y; } `
 
 #### System
 Systems encapsulate the logic of specific aspects of the program. They are modular and can easily be extended, removed or replaced.<br /> 
-`@System class GravitySystem { void run() { /*...*/ } }`
+`@System class GravitySystem(ECM) { void run(ECM ecm) { /*...*/ } }`<br />
+`@System class MovementSystem(ECM) { void run(ECM ecm) { /*...*/ } }`
 
 #### EntityComponentManager
 ...<br />
-`auto ecs = new EntityComponentManager!(PlayerComponent, WeaponComponent)();`
+`auto ecm = new EntityComponentManager!(PlayerComponent, WeaponComponent)();`
 
-#### EntityComponentSystem
+#### SystemManager
 ...<br />
+`alias ECM = EntityComponentManager!(PlayerComponent, WeaponComponent);`<br />
+`auto sm = new SystemManager!(ECM, GravitySystem, MovementSystem)();`
 
 #### Query
 Queries result in a QueryResults (forward ranges) containing all Entities with the requested Components.<br />
@@ -45,28 +48,49 @@ Queries result in a QueryResults (forward ranges) containing all Entities with t
 
     @Component struct PlayerComponent {
         string name; 
-        int health; 
-        int mana; 
+        int x; 
+        int y; 
+        int z;
     } 
     
-    @Component struct WeaponComponent {
-        string name; 
-        int damage; 
+    @Component struct MovementComponent {
+        int x; 
+        int y; 
     }
     
-    @System class GravitySystem { 
-        void run() { 
-            /*...*/ 
+    @System class GravitySystem(ECM) { 
+        void run(ECM ecm) { 
+            foreach(entity; ecm.query!PlayerComponent()) {
+                auto playerComponent = entity.getComponent!PlayerComponent();
+                playerComponent.z -= 1;
+            }
         } 
     }
     
-    auto ecs = /*.....*/
+    @System class MovementSystem(ECM) { 
+        void run(ECM ecm) { 
+            foreach(entity; ecm.query!(PlayerComponent, MovementComponent)()) {
+                auto playerComponent = entity.getComponent!PlayerComponent();
+                auto movementComponent = entity.getComponent!MovementComponent();
+                playerComponent.x += movementComponent.x;
+                playerComponent.y += movementComponent.y;
+            }
+        } 
+    }
+    
+    alias ECM = EntityComponentManager!(PlayerComponent, WeaponComponent);
+    auto sm = new SystemManager!(ECM, GravitySystem, MovementSystem)();
     
     for(;;) {
-        ecs.run();
+        sm.run();
     }
 
 
+# ======================================================
+# ======================================================
+# ======================================================
+# ======================================================
+# ======================================================
 
 ## Usage
 
