@@ -16,7 +16,7 @@ See also:
 ## Terminology
 
 #### Entitiy
-Entities is just unique identifiers. Components can be attached or detached at runtime.<br />
+Entities are just unique identifiers. Components can be attached or detached at runtime.<br />
 `Entity e;`
 
 #### Component
@@ -86,11 +86,19 @@ Queries result in a QueryResults (forward ranges) containing all Entities with t
     }
 
 
-# ======================================================
-# ======================================================
-# ======================================================
-# ======================================================
-# ======================================================
+## License
+
+All parts of nitro are released under the [Boost software license - version 1.0](https://github.com/Zoadian/nitro/blob/master/LICENSE.txt)
+
+
+
+
+
+# ===============================
+# ===============================
+# ===============================
+# ===============================
+# ===============================
 
 ## Usage
 
@@ -173,9 +181,6 @@ getComponent!TestComp() returns an Accessor!TestComp that mimics all fields of t
 Why?<br />
 Let's say we only access TestComp.a but have lots of TestComp components we want to iterate. Normally we'd pull all fields of TestComp into our CPU cache. By using Accessor!TestComp only TestComp.a is pulled in.
 
-## License
-
-All parts of nitro are released under the [Boost software license - version 1.0](https://github.com/Zoadian/nitro/blob/master/LICENSE.txt)
  
 ## Todo
 
