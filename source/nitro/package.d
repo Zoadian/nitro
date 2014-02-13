@@ -8,4 +8,3 @@ Authors: $(WEB zoadian.de, Felix 'Zoadian' Hufnagel) and $(WEB lvl3.org, Paul Fr
 module nitro;
 
 public import nitro.ecs;
-public import nitro.gen;
