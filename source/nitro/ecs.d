@@ -121,11 +121,12 @@ private:
 public:
 	///
 	int opCmp(ref const Entity entity) const @safe nothrow {
-		if(this.id < entity.id)
+		if(this.id < entity.id) {
 			return -1;
-		else if(entity.id < this.id)
+		}
+		else if(entity.id < this.id) {
 			return 1;
-		
+		}		
 		return 0;
 	}
 }
@@ -133,14 +134,16 @@ public:
 final class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length == 0) {
 	alias Components = COMPONENTS;
 	Entity createEntity() @safe nothrow { assert(0); }
-	void deleteLater(Entity entity) @safe nothrow { assert(0); }
-	void deleteLater(PCS...)(Entity entity) @safe nothrow {assert(0); }
-	alias clearLater = deleteLater!COMPONENTS;
-	void executeDelete() { assert(0); }
+	void destroy(Entity entity) @safe nothrow { assert(0); }
+	void destroyNow(Entity entity) @safe nothrow { assert(0); }
 	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) { assert(0); }
+	void addComponentsNow(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) { assert(0); }
 	void removeComponents(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) { assert(0); }
+	void removeComponentsNow(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) { assert(0); }
+	alias clear = removeComponents!COMPONENTS;
+	alias clearNow = removeComponents!COMPONENTS;
+	void flush() @safe nothrow { assert(0); }
 	bool hasComponents(PCS...)(Entity entity) const @safe nothrow if(PCS.length > 0) { assert(0); }
-	Accessor!PC getComponent(PC)(Entity entity) @safe { assert(0); }
 	QueryResult!(typeof(this), COMPONENTS) query(PCS...)() @safe nothrow { assert(0); }
 	void _destroyEntity(Entity entity) @safe nothrow { assert(0); }
 }
@@ -151,10 +154,12 @@ EntityComponentManager
 final class EntityComponentManager(COMPONENTS...) if(COMPONENTS.length > 0) {
 	alias Components = COMPONENTS;
 	alias EntityArray(T) = Entity[];
+	struct ETA(T) { Entity[] entities; T[] components; }
 	import std.typetuple : staticMap;
 	staticMap!(ComponentArray, COMPONENTS) _components;
 	size_t _nextEntityId = 0;
-	Entity[] _deleteLaterntities;
+	Entity[] _deleteLaterEntities;
+	staticMap!(ETA, COMPONENTS) _addLaterComponents;
 	staticMap!(EntityArray, COMPONENTS) _deleteLaterComponents;
 
 	///
@@ -170,39 +175,30 @@ public:
 		return Entity(_nextEntityId++);
 	}
 
-	///
-	void deleteLater(Entity entity) @safe nothrow {
-		this._deleteLaterntities ~= entity;
+	/// entity is destroyed on next flush()
+	void destroy(Entity entity) @safe nothrow {
+		this._deleteLaterEntities ~= entity;
 	}
 
-	///
-	void deleteLater(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
+	/// entity is destroyed immediately	
+	void destroyNow(Entity entity) @safe nothrow {
+		foreach(ref c; _components) {
+			c.remove(entity);
+		}
+	}
+
+	/// components are added on next flush()
+	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) {
 		foreach(i, PC; PCS) {
 			import std.typetuple : staticIndexOf;
 			enum IDX = staticIndexOf!(PC, COMPONENTS);
-			this._deleteLaterComponents[IDX] ~= entity;
+			this._addLaterComponents[IDX].entities ~= entity;
+			this._addLaterComponents[IDX].components ~= pcs[i];
 		}
 	}
 
-	///
-	alias clearLater = deleteLater!COMPONENTS;
-
-	///
-	void executeDelete() {
-		foreach(e; _deleteLaterntities) {
-			this._destroyEntity(e);
-		}
-		_deleteLaterntities.clear();
-		foreach(i, PC; COMPONENTS) {
-			foreach(e; _deleteLaterComponents[i]) {
-				this._components[i].remove(e);
-			}
-			_deleteLaterComponents[i].clear();
-		}		
-	}
-
-	///
-	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) {
+	/// components are added on immediately
+	void addComponentsNow(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) {
 		foreach(i, PC; PCS) {
 			import std.typetuple : staticIndexOf;
 			enum IDX = staticIndexOf!(PC, COMPONENTS);
@@ -210,15 +206,55 @@ public:
 		}
 	}
 
-	///
+	/// components are removed on next flush()
 	void removeComponents(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
 		foreach(i, PC; PCS) {
+			import std.typetuple : staticIndexOf;
+			enum IDX = staticIndexOf!(PC, COMPONENTS);
+			this._deleteLaterComponents[IDX] ~= entity;
+		}
+	}
+	
+	/// components are removed on next immediately
+	void removeComponentsNow(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
+		foreach(i, PC; PCS) {
+			import std.typetuple : staticIndexOf;
 			enum IDX = staticIndexOf!(PC, COMPONENTS);
 			this._components[IDX].remove(entity);
 		}
 	}
+	
+	/// all components are removed on next flush()
+	alias clear = removeComponents!COMPONENTS;
+	
+	/// all components are removed on next immediately
+	alias clearNow = removeComponents!COMPONENTS;
 
-	///
+	/// executes all buffered operations
+	void flush() @safe nothrow {
+		//destroy entities
+		foreach(e; _deleteLaterEntities) {
+			this.destroyNow(e);
+		}
+		this._deleteLaterEntities.clear();
+		//destroy components
+		foreach(i, PC; COMPONENTS) {
+			foreach(e; _deleteLaterComponents[i]) {
+				this.removeComponentsNow!PC(e);
+			}
+			this._deleteLaterComponents[i].clear();
+		}		
+		//add components
+		foreach(i, PC; COMPONENTS) {
+			foreach(k, e; _addLaterComponents[i].entities) {
+				this.addComponentsNow!PC(e, _addLaterComponents[i].components[k]);
+			}
+			this._addLaterComponents[i].entities.clear();
+			this._addLaterComponents[i].components.clear();
+		}	
+	}
+
+	/// immediately
 	bool hasComponents(PCS...)(Entity entity) const @safe nothrow if(PCS.length > 0) {
 		foreach(i, PC; PCS) {
 			import std.typetuple : staticIndexOf;
@@ -230,7 +266,7 @@ public:
 		return true;
 	}
 
-	///
+	/// immediately
 	Accessor!PC getComponent(PC)(Entity entity) @safe {
 		import std.typetuple : staticIndexOf;
 		enum IDX = staticIndexOf!(PC, COMPONENTS);
@@ -238,16 +274,9 @@ public:
 		return this._components[IDX].get(entity);
 	}
 
-	///
+	/// immediately
 	QueryResult!(typeof(this), PCS) query(PCS...)() @safe nothrow if(PCS.length > 0) {
 		return QueryResult!(typeof(this), PCS)(this);
-	}
-	
-private:		
-	void _destroyEntity(Entity entity) @safe nothrow {
-		foreach(ref c; _components) {
-			c.remove(entity);
-		}
 	}
 }
 
@@ -373,7 +402,12 @@ public:
 	Accessor!COMPONENT get(COMPONENT)() @safe nothrow { assert(0); }
 	alias getComponent = get;
 	Entity entity() const @safe nothrow { assert(0); }
-	void deleteLater() @safe nothrow { assert(0); }
+	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) { assert(0); }
+	void addComponentsNow(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) { assert(0); }
+	void removeComponents(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) { assert(0); }
+	void removeComponentsNow(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) { assert(0); }
+	void destroy() @safe nothrow { assert(0); }
+	void destroyNow() @safe nothrow { assert(0); }
 }
 
 /***********************************************************************************************************************
@@ -423,11 +457,36 @@ public:
 		import std.typetuple : staticIndexOf;
 		enum IDX = staticIndexOf!(PCS[0], ECS.Components);
 		return this._ecs._components[IDX].entities[_indices[0]];
+	}	
+
+	///
+	void addComponents(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) {
+		this._ecs.addComponents(PCS)(entity, pcs);
+	}
+	
+	///
+	void addComponentsNow(PCS...)(Entity entity, PCS pcs) @safe nothrow if(PCS.length > 0) {
+		this._ecs.addComponentsNow(PCS)(entity, pcs);
 	}
 
 	///
-	void deleteLater() @safe nothrow {
-		this._ecs.deleteLater(entity);
+	void removeComponents(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
+		this._ecs.removeComponents(PCS)(entity);
+	}
+
+	///
+	void removeComponentsNow(PCS...)(Entity entity) @safe nothrow if(PCS.length > 0) {
+		this._ecs.removeComponentsNow(PCS)(entity);
+	}
+
+	///
+	void destroy() @safe nothrow {
+		this._ecs.destroy(entity);
+	}
+	
+	///
+	void destroyNow() @safe nothrow {
+		this._ecs.destroyNow(entity);
 	}
 }
 
@@ -532,11 +591,11 @@ version(unittest) {
                 assert(runCountSystemOne == 2);
                 countComponentThreeFound++;
 
-                ecm.deleteLater!ComponentThree(e);
-                ecm.deleteLater(e);
+                ecm.removeComponents!ComponentThree(e);
+				ecm.destroy(e);
 
-                ecm.addComponents(ecm.createEntity(), ComponentOne(10,"a",true), ComponentThree());
-                ecm.addComponents(ecm.createEntity(), ComponentTwo(11,"b",false), ComponentThree());
+				ecm.addComponentsNow(ecm.createEntity(), ComponentOne(10,"a",true), ComponentThree());
+				ecm.addComponentsNow(ecm.createEntity(), ComponentTwo(11,"b",false), ComponentThree());
             }
 
             if(runCountSystemOne == 2) { 
@@ -546,7 +605,7 @@ version(unittest) {
                 assert(countComponentThreeFound == 0); 
             }
 
-			ecm.executeDelete();
+			ecm.flush();
         }
     }
 
@@ -567,7 +626,7 @@ version(unittest) {
             foreach(e; ecm.query!ComponentThree()) {
                 assert(runCountSystemOne == 2);
                 countComponentThreeFound++;
-                ecm.clearLater(e);
+                ecm.clear(e);
             }
 
             if(runCountSystemOne == 2) { 
@@ -578,7 +637,7 @@ version(unittest) {
             }
 
 
-			ecm.executeDelete();
+			ecm.flush();
         }
     }
 
@@ -641,13 +700,13 @@ unittest {
 	Entity entity_three = test_ecm.createEntity();
 
 
-	test_ecm.deleteLater(entity_three);
-	test_ecm.executeDelete();
+	test_ecm.destroy(entity_three);
+	test_ecm.flush();
 
 	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_two));
 
-	test_ecm.addComponents(entity_one, ComponentOne(1, "hi", true));
+	test_ecm.addComponentsNow(entity_one, ComponentOne(1, "hi", true));
 
 	assert(test_ecm.hasComponents!ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_one)); 
@@ -656,24 +715,24 @@ unittest {
 
 	assert(!test_ecm.hasComponents!(ComponentOne,ComponentTwo)(entity_one));
 
-	test_ecm.deleteLater!ComponentOne(entity_one);
-	test_ecm.executeDelete();
+	test_ecm.removeComponents!ComponentOne(entity_one);
+	test_ecm.flush();
 
 	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_one));
 	assert(!test_ecm.hasComponents!ComponentOne(entity_two));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_two));
 
-	test_ecm.addComponents(entity_two, ComponentOne(2, "ho", false));
-	test_ecm.addComponents(entity_two, ComponentTwo(3, "lets", true));
+	test_ecm.addComponentsNow(entity_two, ComponentOne(2, "ho", false));
+	test_ecm.addComponentsNow(entity_two, ComponentTwo(3, "lets", true));
 
 	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_one));
 	assert(test_ecm.hasComponents!ComponentOne(entity_two));
 	assert(test_ecm.hasComponents!ComponentTwo(entity_two));
 
-	test_ecm.addComponents(entity_one, ComponentOne(4, "go", false));
-	test_ecm.addComponents(entity_one, ComponentTwo(5, "this", true));
+	test_ecm.addComponentsNow(entity_one, ComponentOne(4, "go", false));
+	test_ecm.addComponentsNow(entity_one, ComponentTwo(5, "this", true));
 
 	assert(test_ecm.hasComponents!ComponentOne(entity_one));
 	assert(test_ecm.hasComponents!ComponentTwo(entity_one));
@@ -687,9 +746,9 @@ unittest {
     assert(component_one.FieldOne == 4 && component_one.FieldTwo == "go" && component_one.FieldThree == false);
 
 	Entity entity_four = test_ecm.createEntity();
-	test_ecm.addComponents(entity_four, ComponentOne(6, "is", false));
-	test_ecm.addComponents(entity_four, ComponentTwo(6, "my", true));
-    test_ecm.deleteLater(entity_four);
+	test_ecm.addComponentsNow(entity_four, ComponentOne(6, "is", false));
+	test_ecm.addComponentsNow(entity_four, ComponentTwo(6, "my", true));
+    test_ecm.destroy(entity_four);
 
 	Entity lastEntity = Entity(size_t.max);
     int currentIteration = 1;
@@ -716,9 +775,9 @@ unittest {
         currentIteration++;
 	}
 
-	test_ecm.deleteLater!ComponentTwo(entity_one);
-	test_ecm.deleteLater!ComponentOne(entity_two);
-	test_ecm.executeDelete();
+	test_ecm.removeComponents!ComponentTwo(entity_one);
+	test_ecm.removeComponents!ComponentOne(entity_two);
+	test_ecm.flush();
 
     int currentIterationTwo = 1;
 	foreach(e; test_ecm.query!ComponentOne()) {
@@ -745,21 +804,21 @@ unittest {
 	assert(!test_ecm.hasComponents!ComponentOne(entity_two));
 	assert(test_ecm.hasComponents!ComponentTwo(entity_two)) ;
 
-	test_ecm.deleteLater!ComponentOne(entity_one);
-	test_ecm.deleteLater!ComponentTwo(entity_two);
-	test_ecm.executeDelete();
+	test_ecm.removeComponents!ComponentOne(entity_one);
+	test_ecm.removeComponents!ComponentTwo(entity_two);
+	test_ecm.flush();
 
 	assert(!test_ecm.hasComponents!ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_one));
 	assert(!test_ecm.hasComponents!ComponentOne(entity_two));
 	assert(!test_ecm.hasComponents!ComponentTwo(entity_two));
 
-	test_ecm.deleteLater(entity_one);
-	test_ecm.deleteLater(entity_two);
-	test_ecm.executeDelete();
+	test_ecm.destroy(entity_one);
+	test_ecm.destroy(entity_two);
+	test_ecm.flush();
 
 	Entity entity_emitter = test_ecm.createEntity();
-	test_ecm.addComponents(entity_emitter, ComponentThree());
+	test_ecm.addComponentsNow(entity_emitter, ComponentThree());
 
 	test_ecs.run();
     assert(runCountSystemOne == 2);
@@ -797,11 +856,11 @@ version(unittest) {
                 assert(AoS_runCountSystemOne == 2);
                 countComponentThreeFound++;
 
-                ecm.deleteLater!AoS_ComponentThree(e);
-                ecm.deleteLater(e);
+				ecm.removeComponents!AoS_ComponentThree(e);
+                ecm.destroy(e);
 
-                ecm.addComponents(ecm.createEntity(), AoS_ComponentOne(10,"a",true), AoS_ComponentThree());
-                ecm.addComponents(ecm.createEntity(), AoS_ComponentTwo(11,"b",false), AoS_ComponentThree());
+				ecm.addComponentsNow(ecm.createEntity(), AoS_ComponentOne(10,"a",true), AoS_ComponentThree());
+				ecm.addComponentsNow(ecm.createEntity(), AoS_ComponentTwo(11,"b",false), AoS_ComponentThree());
             }
 
             if(AoS_runCountSystemOne == 2) { 
@@ -811,7 +870,7 @@ version(unittest) {
                 assert(countComponentThreeFound == 0); 
             }
 
-			ecm.executeDelete();
+			ecm.flush();
         }
     }
 
@@ -832,7 +891,7 @@ version(unittest) {
             foreach(e; ecm.query!AoS_ComponentThree()) {
                 assert(AoS_runCountSystemOne == 2);
                 countComponentThreeFound++;
-                ecm.clearLater(e);
+                ecm.clear(e);
             }
 
             if(AoS_runCountSystemOne == 2) { 
@@ -843,7 +902,7 @@ version(unittest) {
             }
 
 
-			ecm.executeDelete();
+			ecm.flush();
         }
     }
 
@@ -907,13 +966,13 @@ unittest {
 	Entity entity_three = test_ecm.createEntity();
 
 
-	test_ecm.deleteLater(entity_three);
-	test_ecm.executeDelete();
+	test_ecm.destroy(entity_three);
+	test_ecm.flush();
 
 	assert(!test_ecm.hasComponents!AoS_ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!AoS_ComponentTwo(entity_two));
 
-	test_ecm.addComponents(entity_one, AoS_ComponentOne(1, "hi", true));
+	test_ecm.addComponentsNow(entity_one, AoS_ComponentOne(1, "hi", true));
 
 	assert(test_ecm.hasComponents!AoS_ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!AoS_ComponentTwo(entity_one)); 
@@ -922,24 +981,24 @@ unittest {
 
 	assert(!test_ecm.hasComponents!(AoS_ComponentOne,AoS_ComponentTwo)(entity_one));
 
-	test_ecm.deleteLater!AoS_ComponentOne(entity_one);
-	test_ecm.executeDelete();
+	test_ecm.removeComponents!AoS_ComponentOne(entity_one);
+	test_ecm.flush();
 
 	assert(!test_ecm.hasComponents!AoS_ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!AoS_ComponentTwo(entity_one));
 	assert(!test_ecm.hasComponents!AoS_ComponentOne(entity_two));
 	assert(!test_ecm.hasComponents!AoS_ComponentTwo(entity_two));
 
-	test_ecm.addComponents(entity_two, AoS_ComponentOne(2, "ho", false));
-	test_ecm.addComponents(entity_two, AoS_ComponentTwo(3, "lets", true));
+	test_ecm.addComponentsNow(entity_two, AoS_ComponentOne(2, "ho", false));
+	test_ecm.addComponentsNow(entity_two, AoS_ComponentTwo(3, "lets", true));
 
 	assert(!test_ecm.hasComponents!AoS_ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!AoS_ComponentTwo(entity_one));
 	assert(test_ecm.hasComponents!AoS_ComponentOne(entity_two));
 	assert(test_ecm.hasComponents!AoS_ComponentTwo(entity_two));
 
-	test_ecm.addComponents(entity_one, AoS_ComponentOne(4, "go", false));
-	test_ecm.addComponents(entity_one, AoS_ComponentTwo(5, "this", true));
+	test_ecm.addComponentsNow(entity_one, AoS_ComponentOne(4, "go", false));
+	test_ecm.addComponentsNow(entity_one, AoS_ComponentTwo(5, "this", true));
 
 	assert(test_ecm.hasComponents!AoS_ComponentOne(entity_one));
 	assert(test_ecm.hasComponents!AoS_ComponentTwo(entity_one));
@@ -953,9 +1012,9 @@ unittest {
     assert(component_one.FieldOne == 4 && component_one.FieldTwo == "go" && component_one.FieldThree == false);
 
 	Entity entity_four = test_ecm.createEntity();
-	test_ecm.addComponents(entity_four, AoS_ComponentOne(6, "is", false));
-	test_ecm.addComponents(entity_four, AoS_ComponentTwo(6, "my", true));
-    test_ecm.deleteLater(entity_four);
+	test_ecm.addComponentsNow(entity_four, AoS_ComponentOne(6, "is", false));
+	test_ecm.addComponentsNow(entity_four, AoS_ComponentTwo(6, "my", true));
+    test_ecm.destroy(entity_four);
 
 	Entity lastEntity = Entity(size_t.max);
     int currentIteration = 1;
@@ -982,9 +1041,9 @@ unittest {
         currentIteration++;
 	}
 
-	test_ecm.deleteLater!AoS_ComponentTwo(entity_one);
-	test_ecm.deleteLater!AoS_ComponentOne(entity_two);
-	test_ecm.executeDelete();
+	test_ecm.removeComponents!AoS_ComponentTwo(entity_one);
+	test_ecm.removeComponents!AoS_ComponentOne(entity_two);
+	test_ecm.flush();
 
     int currentIterationTwo = 1;
 	foreach(e; test_ecm.query!AoS_ComponentOne()) {
@@ -1011,21 +1070,21 @@ unittest {
 	assert(!test_ecm.hasComponents!AoS_ComponentOne(entity_two));
 	assert(test_ecm.hasComponents!AoS_ComponentTwo(entity_two)) ;
 
-	test_ecm.deleteLater!AoS_ComponentOne(entity_one);
-	test_ecm.deleteLater!AoS_ComponentTwo(entity_two);
-	test_ecm.executeDelete();
+	test_ecm.removeComponents!AoS_ComponentOne(entity_one);
+	test_ecm.removeComponents!AoS_ComponentTwo(entity_two);
+	test_ecm.flush();
 
 	assert(!test_ecm.hasComponents!AoS_ComponentOne(entity_one));
 	assert(!test_ecm.hasComponents!AoS_ComponentTwo(entity_one));
 	assert(!test_ecm.hasComponents!AoS_ComponentOne(entity_two));
 	assert(!test_ecm.hasComponents!AoS_ComponentTwo(entity_two));
 
-	test_ecm.deleteLater(entity_one);
-	test_ecm.deleteLater(entity_two);
-	test_ecm.executeDelete();
+	test_ecm.destroy(entity_one);
+	test_ecm.destroy(entity_two);
+	test_ecm.flush();
 
 	Entity entity_emitter = test_ecm.createEntity();
-	test_ecm.addComponents(entity_emitter, AoS_ComponentThree());
+	test_ecm.addComponentsNow(entity_emitter, AoS_ComponentThree());
 
 	test_ecs.run();
     assert(AoS_runCountSystemOne == 2);
